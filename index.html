@@ -309,7 +309,14 @@ function cleanPdvs(){
 /* ---------- CSV <-> tâches ---------- */
 const HEADER=["Week-date","PDV","Tache","Situation","commentaire","Date","Heure","Urgent"];
 const isUrg=t=>t.urgent&&!isDone(t.status);
-const byPrio=(a,b)=>(isUrg(b)?1:0)-(isUrg(a)?1:0)||byTime(a,b);
+// plus récent d'abord : heure décroissante (sans heure en dernier), puis les dernières ajoutées
+const byNew=(a,b)=>{
+  const x=a.time||"",y=b.time||"";
+  if(x!==y)return !x?1:!y?-1:y.localeCompare(x);
+  return tasks.indexOf(b)-tasks.indexOf(a);
+};
+const byPrio=(a,b)=>(isUrg(b)?1:0)-(isUrg(a)?1:0)||byNew(a,b);
+const byRecent=(a,b)=>b.date.localeCompare(a.date)||byPrio(a,b);
 const parseTime=s=>{const m=(s||"").trim().match(/^(\d{1,2})[:h](\d{2})/);return m&&+m[1]<24&&+m[2]<60?pad(m[1])+":"+m[2]:""};
 const byTime=(a,b)=>(a.time||"99:99").localeCompare(b.time||"99:99");
 function parseCsv(text,sep){
@@ -566,10 +573,12 @@ const inScope=t=>{
   return a<=hi&&b>=lo;
 };
 let urgF=false;
-const matchStatus=t=>(!urgF||isUrg(t))&&(statusF==="all"||(statusF==="fin"?isDone(t.status):t.status===statusF));
+// filtre Urgentes : toutes les urgentes encore « À faire » ou « En cours », tous jours confondus
+const isUrgOpen=t=>t.urgent&&(t.status==="todo"||t.status==="wip");
+const matchStatus=t=>(statusF==="all"||(statusF==="fin"?isDone(t.status):t.status===statusF));
 const matchQ=t=>!q||norm(t.pdv+" "+t.task+" "+t.comment).includes(norm(q));
 const matchPdv=t=>!pdvF||t.pdv===pdvF;
-const scoped=()=>tasks.filter(t=>inScope(t)&&matchPdv(t)&&matchQ(t));
+const scoped=()=>tasks.filter(t=>(urgF?isUrgOpen(t):inScope(t))&&matchPdv(t)&&matchQ(t));
 
 /* ---------- rendu ---------- */
 function renderHero(items){
@@ -584,6 +593,7 @@ function renderHero(items){
     const [a,b]=weekRange(sel);
     title="Semaine du "+fmt(a,{day:"numeric"})+" au "+fmt(b,{day:"numeric",month:"long",year:"numeric"});
   }
+  if(urgF)title="🔥 Urgentes : à faire et en cours";
   $("scopeTitle").textContent=title;
   const S=(k,v,l)=>`<button class="stat${statusF===k?" on":""}" data-s="${k}"><b>${v}</b><span>${l}</span></button>`;
   $("stats").innerHTML=S("all",n,"Total")+S("todo",td,"À faire")+S("wip",w,"En cours")+S("conf",c,"Confirmées")+S("fin",d,"Terminées");
@@ -603,7 +613,7 @@ function renderControls(){
   $("mode").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===mode));
   $("chips").innerHTML=[["all","Toutes"],["todo","À faire"],["wip","En cours"],["conf","Confirmé"],["fin","Terminé"]]
     .map(([k,l])=>`<span class="chip${statusF===k?" on":""}" data-s="${k}">${l}</span>`).join("")+
-    `<span class="chip${urgF?" on":""}" data-u>🔥 Urgentes (${tasks.filter(t=>isUrg(t)&&inScope(t)).length})</span>`;
+    `<span class="chip${urgF?" on":""}" data-u>🔥 Urgentes (${tasks.filter(isUrgOpen).length})</span>`;
   const pdvs=[...new Set(Object.values(canonMap()))].sort((a,b)=>a.localeCompare(b));
   $("pdvSel").innerHTML=`<option value="">Tous les PDV</option>`+pdvs.map(p=>`<option${p===pdvF?" selected":""}>${esc(p)}</option>`).join("");
   $("pdvs").innerHTML=pdvs.map(p=>`<option value="${esc(p)}">`).join("");
@@ -646,7 +656,7 @@ function renderBoard(items){
 function render(){
   const base=scoped();
   renderHero(base);renderStrip();renderControls();
-  const items=base.filter(matchStatus);
+  const items=base.filter(matchStatus).sort(byRecent);
   $("main").innerHTML=mode==="board"?renderBoard(items):renderList(items);
 }
 
@@ -685,13 +695,14 @@ f.onsubmit=e=>{
   sel=v.date;save();render();
 };
 $("strip").onclick=e=>{
+  urgF=false;
   const w=e.target.closest("[data-w]");
   if(w){const [lo,hi]=weekRange(sel);sel=addDays(w.dataset.w<0?lo:hi,Number(w.dataset.w));if(scope==="all")scope="day";render();return}
   if(e.target.closest("[data-today]")){sel=todayIso;if(scope==="all")scope="day";render();return}
   const d=e.target.closest("[data-d]");if(d){sel=d.dataset.d;if(scope==="all")scope="day";savePrefs();render()}
 };
-$("todayBtn").onclick=()=>{sel=todayIso;if(scope==="all")scope="day";render()};
-$("scope").onclick=e=>{const b=e.target.closest("button");if(b){scope=b.dataset.v;savePrefs();render()}};
+$("todayBtn").onclick=()=>{urgF=false;sel=todayIso;if(scope==="all")scope="day";render()};
+$("scope").onclick=e=>{const b=e.target.closest("button");if(b){urgF=false;scope=b.dataset.v;savePrefs();render()}};
 $("mode").onclick=e=>{const b=e.target.closest("button");if(b){mode=b.dataset.v;savePrefs();render()}};
 const pickStatus=e=>{if(e.target.closest("[data-u]")){urgF=!urgF;render();return}const s=e.target.closest("[data-s]");if(s){statusF=statusF===s.dataset.s?"all":s.dataset.s;render()}};
 $("chips").onclick=pickStatus;$("stats").onclick=pickStatus;
