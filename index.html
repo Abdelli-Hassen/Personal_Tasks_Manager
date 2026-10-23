@@ -10,14 +10,14 @@
 <style>
 :root{
   --bg:#e8ecf5;--bg2:#d6dff5;--card:#fff;--ink:#0d1220;--mute:#465069;--line:#c3cce0;
-  --accent:#2f49e0;--accent2:#6a45e8;--accent-soft:#d7defd;--pl:26%;--shadow:0 1px 0 rgba(20,30,70,.06),0 2px 8px rgba(20,30,70,.12);
+  --accent:#2f49e0;--accent2:#6a45e8;--accent-soft:#d7defd;--solid:#2f49e0;--solid2:#6a45e8;--pl:26%;--shadow:0 1px 0 rgba(20,30,70,.06),0 2px 8px rgba(20,30,70,.12);
   --ok:#0a6b38;--ok-bg:#c4ecd5;--wip:#8a4b00;--wip-bg:#ffdf9c;--todo:#38415a;--todo-bg:#d9deec;--conf:#5a22a8;--conf-bg:#e0cffa;--err:#c42b2b;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){
-  --bg:#0f121a;--bg2:#161b2b;--card:#1a1f2b;--ink:#e8ebf3;--mute:#8d97ad;--line:#2a3142;--accent:#7f95ff;--accent2:#a48bff;--accent-soft:#252d50;--pl:78%;--shadow:none;
+  --bg:#0f121a;--bg2:#161b2b;--card:#1a1f2b;--ink:#e8ebf3;--mute:#8d97ad;--line:#2a3142;--accent:#7f95ff;--accent2:#a48bff;--accent-soft:#252d50;--solid:#3d52d6;--solid2:#6140d0;--pl:78%;--shadow:none;
   --ok:#4cc98b;--ok-bg:#153227;--wip:#f1b44f;--wip-bg:#3a2d12;--todo:#a4adc1;--todo-bg:#272d3b;--conf:#bd95f6;--conf-bg:#2d2347;--err:#ff7b7b}}
 :root[data-theme=dark]{
-  --bg:#0f121a;--bg2:#161b2b;--card:#1a1f2b;--ink:#e8ebf3;--mute:#8d97ad;--line:#2a3142;--accent:#7f95ff;--accent2:#a48bff;--accent-soft:#252d50;--pl:78%;--shadow:none;
+  --bg:#0f121a;--bg2:#161b2b;--card:#1a1f2b;--ink:#e8ebf3;--mute:#8d97ad;--line:#2a3142;--accent:#7f95ff;--accent2:#a48bff;--accent-soft:#252d50;--solid:#3d52d6;--solid2:#6140d0;--pl:78%;--shadow:none;
   --ok:#4cc98b;--ok-bg:#153227;--wip:#f1b44f;--wip-bg:#3a2d12;--todo:#a4adc1;--todo-bg:#272d3b;--conf:#bd95f6;--conf-bg:#2d2347;--err:#ff7b7b}
 *{box-sizing:border-box}
 body{margin:0;color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg) linear-gradient(180deg,var(--bg2),var(--bg) 340px) no-repeat;min-height:100vh}
@@ -27,7 +27,7 @@ input,select,textarea{background:var(--card);border:1px solid var(--line);border
 input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
 .btn{border:1px solid var(--line);background:var(--card);padding:8px 14px;border-radius:10px;cursor:pointer;font-size:14px;white-space:nowrap}
 .btn:hover{border-color:var(--accent)}
-.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:0;color:#fff;font-weight:600;padding:9px 16px}
+.btn.primary{background:linear-gradient(135deg,var(--solid),var(--solid2));border:0;color:#fff;font-weight:600;padding:9px 16px}
 .btn.sm{padding:3px 9px;font-size:12.5px}
 
 /* header */
@@ -64,7 +64,7 @@ h1{font-size:26px;margin:0;letter-spacing:-.03em}
 .day i u{display:block;height:100%;background:var(--ok)}
 .day{border:2px solid var(--line)}
 .day:hover{border-color:var(--accent)}
-.day.sel{border-color:var(--accent);background:var(--accent);color:#fff;transform:translateY(-2px)}
+.day.sel{border-color:var(--solid);background:var(--solid);color:#fff;transform:translateY(-2px)}
 .day.sel small,.day.sel em{color:rgba(255,255,255,.85)}
 .day.sel i{background:rgba(255,255,255,.3)}.day.sel i u{background:#fff}
 .day.today:not(.sel){border-color:var(--accent)}
@@ -74,7 +74,7 @@ h1{font-size:26px;margin:0;letter-spacing:-.03em}
 .task{border-left:6px solid var(--bar,var(--line))}
 .st-todo{--bar:var(--todo)}.st-wip{--bar:var(--wip)}.st-conf{--bar:var(--conf)}.st-ok,.st-done{--bar:var(--ok)}
 .hero{border:1px solid var(--line)}
-.stat.on{background:var(--accent);color:#fff}.stat.on span{color:rgba(255,255,255,.85)}
+.stat.on{background:var(--solid);border-color:var(--solid);color:#fff}.stat.on span{color:rgba(255,255,255,.85)}
 .seg button.on,.chip.on{box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .navb{align-self:center;flex:none}
 
@@ -83,7 +83,7 @@ h1{font-size:26px;margin:0;letter-spacing:-.03em}
 .toolbar .grow{flex:1;min-width:170px}
 .seg{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
 .seg button{border:0;background:none;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:13.5px;color:var(--mute)}
-.seg button.on{background:var(--accent);color:#fff}
+.seg button.on{background:var(--solid);color:#fff}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
 .chip{padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-size:13px;color:var(--mute)}
 .chip.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
