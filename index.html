@@ -176,7 +176,7 @@ dialog .acts{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
   <header>
     <div><h1>Suivi des tâches</h1><div class="sub" id="today"></div></div>
     <div class="hr">
-      <div class="pill" id="pill"><i class="dot"></i><span id="pillTxt"></span><button class="btn sm" id="pillBtn"></button><button class="btn sm" id="pillBtn2">Délier</button></div>
+      <div class="pill" id="pill"><i class="dot"></i><span id="pillTxt"></span><button class="btn sm" id="pillBtn"></button><button class="btn sm" id="pillBtn2">Délier</button><button class="btn sm" id="pillBtn3" title="Recharger depuis le fichier">↻</button></div>
       <details class="menu" id="expMenu"><summary class="btn">⤓ Exporter</summary>
         <div class="menubox">
           <button data-ex="xlsx-all">Excel (.xlsx) — tout</button>
@@ -357,6 +357,7 @@ function setFs(state,msg=""){
     nofs:["Navigateur non compatible (utilisez Chrome ou Edge)","Exporter CSV"]}[state];
   $("pillTxt").textContent=t[0];b.textContent=t[1];b.hidden=!t[1];
   $("pillBtn2").hidden=!handle||state==="busy";
+  $("pillBtn3").hidden=!(handle&&(state==="ok"||state==="err"));
   renderConnect();
 }
 function renderConnect(){
@@ -400,17 +401,26 @@ async function createFile(){
     toast("Fichier créé : "+h.name);
   }catch(e){if(e.name!=="AbortError")setFs("err",e.message)}
 }
-async function loadFromFile(first){
+async function readText(file){
+  // Excel enregistre un « CSV » simple en Windows-1252 : on le décode correctement au lieu d'abîmer les accents
+  const buf=await file.arrayBuffer();
+  try{return new TextDecoder("utf-8",{fatal:true}).decode(buf)}
+  catch(e){return new TextDecoder("windows-1252").decode(buf)}
+}
+async function loadFromFile(first,keepSel){
   const f=await handle.getFile();lastMod=f.lastModified;
-  const loaded=fromCsv(await f.text());
+  const loaded=fromCsv(await readText(f));
   if(loaded.length){
     if(first&&tasks.length&&!confirm(`Charger les ${loaded.length} tâches du fichier ?\n\nOK = utiliser le fichier\nAnnuler = garder les ${tasks.length} tâches de cette page et écraser le fichier`)){
       return writeNow();
     }
     tasks=loaded;const fixed=cleanPdvs();persistLocal();
-    const dates=tasks.filter(t=>!t.week).map(t=>t.date);
-    sel=dates.includes(todayIso)?todayIso:(dates.sort().pop()||tasks.map(t=>t.date).sort().pop()||todayIso);
-    render();setFs("ok","chargé");toast(tasks.length+" tâches chargées depuis "+handle.name);
+    if(!keepSel){
+      const dates=tasks.filter(t=>!t.week).map(t=>t.date);
+      sel=dates.includes(todayIso)?todayIso:(dates.sort().pop()||tasks.map(t=>t.date).sort().pop()||todayIso);
+    }
+    render();setFs("ok","chargé");
+    if(!keepSel)toast(tasks.length+" tâches chargées depuis "+handle.name);
     if(fixed){save();toast(fixed+" nom(s) de PDV harmonisé(s) (ex. lac / LAC)")}
   }else if(tasks.length)return writeNow();
   else setFs("ok");
@@ -437,14 +447,25 @@ function writeNow(){
   });
   return busy;
 }
+// Surveille le fichier : si Excel (ou autre) le modifie, la page se met à jour toute seule.
+let asking=false;
 async function syncOnFocus(){
-  if(!handle||fsState==="perm")return;
+  if(!handle||fsState==="perm"||fsState==="busy"||asking)return;
   try{
-    if(dirty)return writeNow();
     const f=await handle.getFile();
-    if(f.lastModified!==lastMod){await loadFromFile(false);toast("Fichier modifié ailleurs : données rechargées")}
+    if(f.lastModified!==lastMod){
+      if(dirty){
+        asking=true;
+        const load=confirm("Le fichier a été modifié ailleurs (Excel ?) alors que la page a des changements non enregistrés.\n\nOK = charger la version du fichier (changements de la page perdus)\nAnnuler = garder la page et écraser le fichier");
+        asking=false;
+        if(!load)return writeNow();
+      }
+      await loadFromFile(false,true);
+      toast("Fichier modifié ailleurs : page actualisée");
+    }else if(dirty)return writeNow();
   }catch(e){}
 }
+setInterval(()=>{if(!document.hidden)syncOnFocus()},2000);
 $("pillBtn").onclick=async()=>{
   if(fsState==="perm"){try{if(await ensurePerm(handle,true)){await loadFromFile(false)}}catch(e){setFs("err",e.message)}}
   else if(fsState==="err")writeNow();
@@ -500,6 +521,10 @@ async function unlinkFile(){
   handle=null;dirty=false;lastMod=0;await kvSet("h",null);
   skipConnect=false;setFs("none");
 }
+$("pillBtn3").onclick=async()=>{
+  if(!handle)return;
+  try{await loadFromFile(false,true);toast("Actualisé depuis le fichier")}catch(e){setFs("err",e.message)}
+};
 // Délier : le fichier n'est plus touché et la page repart de zéro (Annuler remet les tâches)
 $("pillBtn2").onclick=async()=>{
   if(!handle)return;
