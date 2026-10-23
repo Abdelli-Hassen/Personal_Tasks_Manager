@@ -1,0 +1,6 @@
+# Your task data must never be committed: the app edits it locally, outside this repo.
+*.csv
+*.xlsx
+.vercel
+node_modules
+.DS_Store

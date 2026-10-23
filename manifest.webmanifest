@@ -1,0 +1,14 @@
+{
+  "name": "Suivi des tâches",
+  "short_name": "Suivi",
+  "description": "Suivi quotidien des tâches, enregistré directement dans votre fichier CSV local.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#e8ecf5",
+  "theme_color": "#2f49e0",
+  "lang": "fr",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
