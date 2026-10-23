@@ -143,6 +143,24 @@ dialog .acts{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
 .menubox{position:absolute;right:0;top:calc(100% + 6px);background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:6px;z-index:5;min-width:270px}
 .menubox button{display:block;width:100%;text-align:left;border:0;background:none;padding:9px 12px;border-radius:8px;cursor:pointer;font-size:14px}
 .menubox button:hover{background:var(--accent-soft)}
+/* mise en page : tout aligné sur la même grille */
+.hero-main{min-width:0}
+.scope-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.scope-row .scope-title{margin:0}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.stat{min-width:0;padding:10px 14px}
+.strip{display:grid;grid-template-columns:44px 1fr 44px;gap:10px;align-items:stretch;overflow:visible;padding:0;margin-bottom:16px}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;min-width:0}
+.day{height:92px;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.day em{height:16px;line-height:16px}
+.day i{width:56%;margin:5px 0 0}
+.navb{width:auto;align-self:stretch;font-size:22px;padding:0;border-radius:14px}
+@media (max-width:700px){
+  .stats{grid-template-columns:repeat(3,1fr)}
+  .strip{grid-template-columns:34px 1fr 34px;gap:6px}
+  .days{gap:5px}.day{height:78px}.day strong{font-size:17px}.day em{font-size:10.5px}
+  .toolbar .seg{flex:1 1 auto}
+}
 [hidden]{display:none!important}
 @media (max-width:700px){
   .hero{grid-template-columns:1fr;justify-items:start}
@@ -175,7 +193,7 @@ dialog .acts{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
 
   <section class="hero">
     <div class="ring"><svg width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="40" fill="none" stroke="var(--line)" stroke-width="9"/><circle id="arc" cx="48" cy="48" r="40" fill="none" stroke="var(--ok)" stroke-width="9" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="251.3" style="transition:stroke-dashoffset .5s"/></svg><b id="pct">0%</b></div>
-    <div><div class="scope-title" id="scopeTitle"></div><div class="stats" id="stats"></div></div>
+    <div class="hero-main"><div class="scope-row"><div class="scope-title" id="scopeTitle"></div><button class="btn sm" id="todayBtn">Aujourd'hui</button></div><div class="stats" id="stats"></div></div>
   </section>
 
   <div class="strip" id="strip"></div>
@@ -531,7 +549,7 @@ function renderStrip(){
       <small>${DAYS[parse(s).getDay()]}</small><strong>${parse(s).getDate()}</strong>
       <em>${list.length?d+"/"+list.length:"–"}</em><i><u style="width:${list.length?d/list.length*100:0}%"></u></i></div>`;
   }
-  $("strip").innerHTML=h+`</div><button class="btn navb" data-w="1">›</button><button class="btn navb" data-today>Aujourd'hui</button>`;
+  $("strip").innerHTML=h+`</div><button class="btn navb" data-w="1">›</button>`;
 }
 function renderControls(){
   $("scope").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===scope));
@@ -618,6 +636,7 @@ $("strip").onclick=e=>{
   if(e.target.closest("[data-today]")){sel=todayIso;if(scope==="all")scope="day";render();return}
   const d=e.target.closest("[data-d]");if(d){sel=d.dataset.d;if(scope==="all")scope="day";savePrefs();render()}
 };
+$("todayBtn").onclick=()=>{sel=todayIso;if(scope==="all")scope="day";render()};
 $("scope").onclick=e=>{const b=e.target.closest("button");if(b){scope=b.dataset.v;savePrefs();render()}};
 $("mode").onclick=e=>{const b=e.target.closest("button");if(b){mode=b.dataset.v;savePrefs();render()}};
 const pickStatus=e=>{const s=e.target.closest("[data-s]");if(s){statusF=statusF===s.dataset.s?"all":s.dataset.s;render()}};
