@@ -137,12 +137,30 @@ dialog .acts{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
 .connect p{margin:0 auto 14px;max-width:520px;color:var(--mute)}
 .connect .fname{font-weight:700;color:var(--ink);font-size:17px;background:var(--accent-soft);display:inline-block;padding:6px 14px;border-radius:10px;margin-bottom:12px}
 .connect .btn{margin:0 4px}
+.connect .skip{margin:16px auto 0;font-size:13px}
+.connect a{color:var(--accent);font-weight:600}
 .menu{position:relative}
 .menu summary{list-style:none;cursor:pointer;user-select:none}
 .menu summary::-webkit-details-marker{display:none}
 .menubox{position:absolute;right:0;top:calc(100% + 6px);background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:6px;z-index:5;min-width:270px}
 .menubox button{display:block;width:100%;text-align:left;border:0;background:none;padding:9px 12px;border-radius:8px;cursor:pointer;font-size:14px}
 .menubox button:hover{background:var(--accent-soft)}
+/* urgent */
+.urgl{display:flex!important;align-items:center;gap:8px;color:var(--ink)!important;font-size:14px!important;cursor:pointer}
+.urgl{position:relative;padding:8px 12px;border:1px solid var(--line);border-radius:12px;user-select:none}
+.urgl input{position:absolute;opacity:0;pointer-events:none}
+.urgl .fire{font-size:26px;line-height:1;filter:grayscale(1);opacity:.3;transition:.15s}
+.urgl input:checked~.fire{filter:none;opacity:1;transform:scale(1.1)}
+.urgl:has(input:checked){border-color:var(--err);background:color-mix(in srgb,var(--err) 10%,var(--card))}
+.urgl input:focus-visible~.fire{outline:2px solid var(--accent);border-radius:6px}
+.urgl .on-t{display:none;font-weight:650}.urgl input:checked~.on-t{display:inline}.urgl input:checked~.off-t{display:none}
+.fire.icon{font-size:17px;filter:grayscale(1);opacity:.3}
+.fire.icon:hover{opacity:.75}
+.fire.icon.lit{filter:none;opacity:1}
+.task.urgent,.card.urgent{--bar:var(--err);background:color-mix(in srgb,var(--err) 8%,var(--card))}
+.card.urgent{border-left:5px solid var(--err)}
+.ub{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.06em;color:#fff;background:var(--err);border-radius:6px;padding:2px 7px;margin-right:6px;vertical-align:1px}
+.icon.on{color:var(--err)}
 /* mise en page : tout aligné sur la même grille */
 .hero-main{min-width:0}
 .scope-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
@@ -219,6 +237,7 @@ dialog .acts{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
     <label class="full">Tâche<input name="task" required placeholder="Que faut-il faire ?"></label>
     <label class="full">Commentaire<input name="comment" placeholder="optionnel"></label>
     <datalist id="pdvs"></datalist>
+    <label class="full urgl"><input type="checkbox" name="urgent"><span class="fire">🔥</span><span class="ut on-t">Urgente : allumée, en haut de la liste</span><span class="ut off-t">Pas urgente : éteinte (cliquer pour allumer)</span></label>
     <div class="acts"><button type="button" class="btn" id="cancel">Annuler</button><button class="btn primary" id="ok">Ajouter</button></div>
   </form>
 </dialog>
@@ -288,7 +307,9 @@ function cleanPdvs(){
 }
 
 /* ---------- CSV <-> tâches ---------- */
-const HEADER=["Week-date","PDV","Tache","Situation","commentaire","Date","Heure"];
+const HEADER=["Week-date","PDV","Tache","Situation","commentaire","Date","Heure","Urgent"];
+const isUrg=t=>t.urgent&&!isDone(t.status);
+const byPrio=(a,b)=>(isUrg(b)?1:0)-(isUrg(a)?1:0)||byTime(a,b);
 const parseTime=s=>{const m=(s||"").trim().match(/^(\d{1,2})[:h](\d{2})/);return m&&+m[1]<24&&+m[2]<60?pad(m[1])+":"+m[2]:""};
 const byTime=(a,b)=>(a.time||"99:99").localeCompare(b.time||"99:99");
 function parseCsv(text,sep){
@@ -312,12 +333,12 @@ function fromCsv(text){
   const sep=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?";":",";
   const out=[];let label=null,start=null;
   parseCsv(text,sep).forEach((r,i)=>{
-    const [a,pdv,task,st,cm,dcol,tcol]=r.map(x=>(x||"").trim());
+    const [a,pdv,task,st,cm,dcol,tcol,ucol]=r.map(x=>(x||"").trim());
     if(i===0&&norm(task)==="tache")return;
     if(a&&!pdv&&!task){label=a;start=labelStart(a);return}
     if(!pdv&&!task)return;
     const d=parseDate(dcol)||parseDate(a);
-    out.push({id:uid(),date:d||start||todayIso,week:!d,weekLabel:d?null:label,pdv,task,status:BYLABEL[norm(st)]||"todo",comment:cm||"",time:parseTime(tcol)});
+    out.push({id:uid(),date:d||start||todayIso,week:!d,weekLabel:d?null:label,pdv,task,status:BYLABEL[norm(st)]||"todo",comment:cm||"",time:parseTime(tcol),urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||"")});
   });
   return out;
 }
@@ -331,8 +352,8 @@ function toCsv(){
   const key=l=>labelStart(l)||"9999";
   const rows=[HEADER];
   [...groups.entries()].sort((x,y)=>key(x[0]).localeCompare(key(y[0]))).forEach(([label,list])=>{
-    rows.push([label,"","","","","",""]);
-    [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||""]));
+    rows.push([label,"","","","","","",""]);
+    [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":""]));
   });
   return "﻿"+rows.map(r=>r.map(cell).join(";")).join("\r\n")+"\r\n";
 }
@@ -364,7 +385,7 @@ function renderConnect(){
   const c=$("connect"),show=["none","perm","nofs"].includes(fsState)&&!(fsState==="none"&&skipConnect);
   c.hidden=!show;if(!show)return;
   c.innerHTML={
-    none:`<h2>Choisissez votre fichier de suivi</h2><p>Sélectionnez votre fichier CSV une seule fois. L'application le lit, puis y enregistre chaque modification automatiquement, sur votre ordinateur. Rien n'est envoyé en ligne.</p><button class="btn primary" data-c="pick">Choisir mon fichier CSV</button><button class="btn" data-c="create">Je n'ai pas de fichier : en créer un</button><p style="margin:14px 0 0;font-size:13px"><a href="#" data-c="skip">Continuer sans fichier</a> (données gardées dans ce navigateur, exportables à tout moment)</p>`,
+    none:`<h2>Choisissez votre fichier de suivi</h2><p>Sélectionnez votre fichier CSV une seule fois. L'application le lit, puis y enregistre chaque modification automatiquement, sur votre ordinateur. Rien n'est envoyé en ligne.</p><button class="btn primary" data-c="pick">Choisir mon fichier CSV</button><button class="btn" data-c="create">Je n'ai pas de fichier : en créer un</button><p class="skip"><a href="#" data-c="skip">Continuer sans fichier</a> (données gardées dans ce navigateur, exportables à tout moment)</p>`,
     perm:`<h2>Est-ce le bon fichier ?</h2><div class="fname">${esc(handle?handle.name:"")}</div><p>Confirmez pour l'ouvrir et reprendre le suivi là où vous l'avez laissé.</p><button class="btn primary" data-c="ok">Oui, ouvrir ce fichier</button><button class="btn" data-c="pick">Choisir un autre fichier</button>`,
     nofs:`<h2>Navigateur non compatible</h2><p>L'enregistrement direct dans le fichier fonctionne avec Chrome ou Edge sur ordinateur. Ici, utilisez « Exporter ».</p>`
   }[fsState];
@@ -483,7 +504,7 @@ const stamp=()=>iso(new Date());
 function flatRows(list){
   return [...list].sort((a,b)=>a.date.localeCompare(b.date)||byTime(a,b)).map(t=>({
     "Semaine":t.week&&t.weekLabel?t.weekLabel:weekLabel(t.date),
-    "Date":t.week?"":t.date,"Heure":t.time||"","PDV":t.pdv,"Tâche":t.task,"Situation":STATUS[t.status].label,"Commentaire":t.comment}));
+    "Date":t.week?"":t.date,"Heure":t.time||"","Urgent":t.urgent?"Oui":"","PDV":t.pdv,"Tâche":t.task,"Situation":STATUS[t.status].label,"Commentaire":t.comment}));
 }
 function loadXlsx(){
   if(window.XLSX)return Promise.resolve();
@@ -497,8 +518,8 @@ function loadXlsx(){
 async function exportXlsx(list,name){
   try{await loadXlsx()}catch(e){return toast(e.message)}
   const rows=flatRows(list);
-  const ws=XLSX.utils.json_to_sheet(rows,{header:["Semaine","Date","Heure","PDV","Tâche","Situation","Commentaire"]});
-  ws["!cols"]=[{wch:22},{wch:12},{wch:8},{wch:18},{wch:60},{wch:12},{wch:34}];
+  const ws=XLSX.utils.json_to_sheet(rows,{header:["Semaine","Date","Heure","Urgent","PDV","Tâche","Situation","Commentaire"]});
+  ws["!cols"]=[{wch:22},{wch:12},{wch:8},{wch:8},{wch:18},{wch:60},{wch:12},{wch:34}];
   ws["!autofilter"]={ref:ws["!ref"]};
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Tâches");
   XLSX.writeFile(wb,name);
@@ -544,7 +565,8 @@ const inScope=t=>{
   const [lo,hi]=weekRange(sel),[a,b]=range(t);
   return a<=hi&&b>=lo;
 };
-const matchStatus=t=>statusF==="all"||(statusF==="fin"?isDone(t.status):t.status===statusF);
+let urgF=false;
+const matchStatus=t=>(!urgF||isUrg(t))&&(statusF==="all"||(statusF==="fin"?isDone(t.status):t.status===statusF));
 const matchQ=t=>!q||norm(t.pdv+" "+t.task+" "+t.comment).includes(norm(q));
 const matchPdv=t=>!pdvF||t.pdv===pdvF;
 const scoped=()=>tasks.filter(t=>inScope(t)&&matchPdv(t)&&matchQ(t));
@@ -580,7 +602,8 @@ function renderControls(){
   $("scope").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===scope));
   $("mode").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===mode));
   $("chips").innerHTML=[["all","Toutes"],["todo","À faire"],["wip","En cours"],["conf","Confirmé"],["fin","Terminé"]]
-    .map(([k,l])=>`<span class="chip${statusF===k?" on":""}" data-s="${k}">${l}</span>`).join("");
+    .map(([k,l])=>`<span class="chip${statusF===k?" on":""}" data-s="${k}">${l}</span>`).join("")+
+    `<span class="chip${urgF?" on":""}" data-u>🔥 Urgentes (${tasks.filter(t=>isUrg(t)&&inScope(t)).length})</span>`;
   const pdvs=[...new Set(Object.values(canonMap()))].sort((a,b)=>a.localeCompare(b));
   $("pdvSel").innerHTML=`<option value="">Tous les PDV</option>`+pdvs.map(p=>`<option${p===pdvF?" selected":""}>${esc(p)}</option>`).join("");
   $("pdvs").innerHTML=pdvs.map(p=>`<option value="${esc(p)}">`).join("");
@@ -588,11 +611,12 @@ function renderControls(){
 const pdvTag=t=>`<span class="pdv" style="--h:${hue(t.pdv)}">${esc(t.pdv)}</span>`;
 function taskHtml(t){
   const s=STATUS[t.status];
-  return `<div class="task st-${t.status}${isDone(t.status)?" done":""}" data-id="${t.id}">
+  return `<div class="task st-${t.status}${isDone(t.status)?" done":""}${isUrg(t)?" urgent":""}" data-id="${t.id}">
     <button class="chk" data-act="tick" title="Terminer / rouvrir">✓</button>
-    <div class="t" data-act="edit">${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}${esc(t.task)}${t.week?`<span class="wk" title="Seule la semaine est connue. Modifiez la tâche pour fixer le jour.">jour ?</span>`:""}${t.comment?`<span class="c">${esc(t.comment)}</span>`:""}</div>
+    <div class="t" data-act="edit">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}${esc(t.task)}${t.week?`<span class="wk" title="Seule la semaine est connue. Modifiez la tâche pour fixer le jour.">jour ?</span>`:""}${t.comment?`<span class="c">${esc(t.comment)}</span>`:""}</div>
     <div class="right">
       <select class="badge ${s.cls}" data-act="st">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}"${k===t.status?" selected":""}>${v.label}</option>`).join("")}</select>
+      <button class="icon fire${t.urgent?" lit":""}" data-act="urg" title="${t.urgent?"Urgent : cliquer pour éteindre":"Pas urgent : cliquer pour allumer"}">🔥</button>
       <button class="icon" data-act="edit" title="Modifier">✎</button>
       <button class="icon" data-act="del" title="Supprimer">✕</button>
     </div></div>`;
@@ -600,7 +624,7 @@ function taskHtml(t){
 function renderList(items){
   if(!items.length)return `<div class="empty"><b>Aucune tâche ici</b>${tasks.length?"Changez de jour ou de filtre, ou ":""}cliquez sur « + Nouvelle tâche ».</div>`;
   const wkKey=t=>t.week&&labelStart(t.weekLabel)?"W"+t.weekLabel:t.date;
-  const g={};[...items].sort(byTime).forEach(t=>(g[wkKey(t)]??=[]).push(t));
+  const g={};[...items].sort(byPrio).forEach(t=>(g[wkKey(t)]??=[]).push(t));
   const sortKey=k=>k[0]==="W"?labelStart(k.slice(1)):k;
   return Object.keys(g).sort((a,b)=>sortKey(b).localeCompare(sortKey(a))).map(dt=>{
     const l=g[dt],done=l.filter(t=>isDone(t.status)).length,open=l.filter(t=>!isDone(t.status)).length;
@@ -616,7 +640,7 @@ function renderBoard(items){
   return `<div class="board">`+COLS.map(([k,l])=>{
     const c=items.filter(t=>colOf(t.status)===k);
     return `<div class="col" data-col="${k}"><h4>${l}<span>${c.length}</span></h4>${c.map(t=>
-      `<div class="card" draggable="true" data-id="${t.id}">${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}<div>${esc(t.task)}</div>${t.comment?`<small>${esc(t.comment)}</small>`:""}${scope!=="day"?`<small>${fmt(t.date,{weekday:"short",day:"numeric",month:"short"})}${t.week?" · jour ?":""}</small>`:""}</div>`).join("")}</div>`;
+      `<div class="card${isUrg(t)?" urgent":""}" draggable="true" data-id="${t.id}">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}<div>${esc(t.task)}</div>${t.comment?`<small>${esc(t.comment)}</small>`:""}${scope!=="day"?`<small>${fmt(t.date,{weekday:"short",day:"numeric",month:"short"})}${t.week?" · jour ?":""}</small>`:""}</div>`).join("")}</div>`;
   }).join("")+`</div>`;
 }
 function render(){
@@ -638,19 +662,24 @@ function setStatus(t,s){t.status=s;save();render()}
 
 const dlg=$("dlg"),f=$("form");
 f.status.innerHTML=Object.entries(STATUS).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join("");
+let timeTouched=false;
+f.time.oninput=()=>{timeTouched=true};
 function openForm(t){
   editId=t?t.id:null;
   $("dlgTitle").textContent=t?"Modifier la tâche":"Nouvelle tâche";$("ok").textContent=t?"Enregistrer":"Ajouter";
   f.date.value=t?t.date:(scope==="all"?todayIso:sel);f.pdv.value=t?t.pdv:pdvF;f.task.value=t?t.task:"";
-  f.comment.value=t?t.comment:"";f.status.value=t?t.status:"todo";
+  f.comment.value=t?t.comment:"";f.status.value=t?t.status:"todo";f.urgent.checked=!!(t&&t.urgent);
   f.time.value=t?(t.time||""):new Date().toTimeString().slice(0,5);
+  timeTouched=!!t;
   dlg.showModal();(t?f.task:f.pdv).focus();
 }
 $("new").onclick=()=>openForm();
 $("cancel").onclick=()=>dlg.close();
 f.onsubmit=e=>{
   if(!f.checkValidity())return;
-  const v={date:f.date.value,pdv:f.pdv.value.trim(),task:f.task.value.trim(),comment:f.comment.value.trim(),status:f.status.value,time:f.time.value,week:false,weekLabel:null};
+  const v={date:f.date.value,pdv:f.pdv.value.trim(),task:f.task.value.trim(),comment:f.comment.value.trim(),status:f.status.value,time:f.time.value,urgent:f.urgent.checked,week:false,weekLabel:null};
+  // heure laissée telle quelle = l'heure de l'enregistrement, pas celle de l'ouverture du formulaire
+  if(!editId&&!timeTouched)v.time=new Date().toTimeString().slice(0,5);
   v.pdv=v.pdv.replace(/\s+/g," ");v.pdv=canonMap()[pkey(v.pdv)]||v.pdv;
   if(editId)Object.assign(find(editId),v);else tasks.push({id:uid(),...v});
   sel=v.date;save();render();
@@ -664,7 +693,7 @@ $("strip").onclick=e=>{
 $("todayBtn").onclick=()=>{sel=todayIso;if(scope==="all")scope="day";render()};
 $("scope").onclick=e=>{const b=e.target.closest("button");if(b){scope=b.dataset.v;savePrefs();render()}};
 $("mode").onclick=e=>{const b=e.target.closest("button");if(b){mode=b.dataset.v;savePrefs();render()}};
-const pickStatus=e=>{const s=e.target.closest("[data-s]");if(s){statusF=statusF===s.dataset.s?"all":s.dataset.s;render()}};
+const pickStatus=e=>{if(e.target.closest("[data-u]")){urgF=!urgF;render();return}const s=e.target.closest("[data-s]");if(s){statusF=statusF===s.dataset.s?"all":s.dataset.s;render()}};
 $("chips").onclick=pickStatus;$("stats").onclick=pickStatus;
 $("q").oninput=e=>{q=e.target.value;render()};
 $("pdvSel").onchange=e=>{pdvF=e.target.value;render()};
@@ -682,6 +711,7 @@ $("main").onclick=e=>{
   const a=e.target.closest("[data-act]");if(!a||a.tagName==="SELECT")return;
   const t=find(a.closest(".task").dataset.id);
   if(a.dataset.act==="edit")openForm(t);
+  if(a.dataset.act==="urg"){t.urgent=!t.urgent;save();render()}
   if(a.dataset.act==="tick")setStatus(t,isDone(t.status)?"todo":"ok");
   if(a.dataset.act==="del"){toast("Tâche supprimée",true);tasks=tasks.filter(x=>x!==t);save();render()}
 };
