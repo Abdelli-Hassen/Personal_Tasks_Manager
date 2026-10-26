@@ -220,6 +220,7 @@ dialog .acts{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
     <div class="seg" id="scope"><button data-v="day">Jour</button><button data-v="week">Semaine</button><button data-v="all">Tout</button></div>
     <div class="seg" id="mode"><button data-v="list">Liste</button><button data-v="board">Tableau</button></div>
     <input class="grow" id="q" type="search" placeholder="Rechercher…  ( / )">
+    <div class="seg" id="qf" title="Où chercher"><button data-v="pdv">Contexte</button><button data-v="task">Tâche</button><button data-v="all">Tout</button></div>
     <select id="pdvSel"></select>
   </div>
   <div class="chips" id="chips"></div>
@@ -283,9 +284,9 @@ const KEY="suivi-taches-v2";
 let tasks=[];
 try{tasks=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){}
 if(!Array.isArray(tasks))tasks=[];
-let sel=todayIso,scope="day",mode="list",statusF="all",pdvF="",q="",editId=null;
-try{const p=JSON.parse(localStorage.getItem("suivi-prefs")||"{}");scope=p.scope||scope;mode=p.mode||mode;if(p.theme)document.documentElement.dataset.theme=p.theme}catch(e){}
-const savePrefs=()=>{try{localStorage.setItem("suivi-prefs",JSON.stringify({scope,mode,theme:document.documentElement.dataset.theme}))}catch(e){}};
+let sel=todayIso,scope="day",mode="list",statusF="all",pdvF="",q="",qf="pdv",editId=null;
+try{const p=JSON.parse(localStorage.getItem("suivi-prefs")||"{}");scope=p.scope||scope;mode=p.mode||mode;qf=p.qf||qf;if(p.theme)document.documentElement.dataset.theme=p.theme}catch(e){}
+const savePrefs=()=>{try{localStorage.setItem("suivi-prefs",JSON.stringify({scope,mode,qf,theme:document.documentElement.dataset.theme}))}catch(e){}};
 
 /* ---------- noms de PDV : "lac" / "LAC" / "Lac" => une seule graphie ---------- */
 const pkey=s=>norm(s).replace(/\s+/g," ");
@@ -576,7 +577,9 @@ let urgF=false;
 // filtre Urgentes : toutes les urgentes encore « À faire » ou « En cours », tous jours confondus
 const isUrgOpen=t=>t.urgent&&(t.status==="todo"||t.status==="wip");
 const matchStatus=t=>(statusF==="all"||(statusF==="fin"?isDone(t.status):t.status===statusF));
-const matchQ=t=>!q||norm(t.pdv+" "+t.task+" "+t.comment).includes(norm(q));
+// champ visé par la recherche : contexte (PDV), tâche, ou tout (PDV + tâche + commentaire)
+const qText=t=>qf==="pdv"?t.pdv:qf==="task"?t.task:t.pdv+" "+t.task+" "+t.comment;
+const matchQ=t=>!q||norm(qText(t)).includes(norm(q));
 const matchPdv=t=>!pdvF||t.pdv===pdvF;
 // une recherche en cours porte sur toutes les tâches, tous jours confondus
 const scoped=()=>tasks.filter(t=>(q.trim()||(urgF?isUrgOpen(t):inScope(t)))&&matchPdv(t)&&matchQ(t));
@@ -613,6 +616,7 @@ function renderStrip(){
 function renderControls(){
   $("scope").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===scope));
   $("mode").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===mode));
+  $("qf").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===qf));
   $("chips").innerHTML=[["all","Toutes"],["todo","À faire"],["wip","En cours"],["conf","Confirmé"],["fin","Terminé"]]
     .map(([k,l])=>`<span class="chip${statusF===k?" on":""}" data-s="${k}">${l}</span>`).join("")+
     `<span class="chip${urgF?" on":""}" data-u>🔥 Urgentes (${tasks.filter(isUrgOpen).length})</span>`;
@@ -709,6 +713,7 @@ $("mode").onclick=e=>{const b=e.target.closest("button");if(b){mode=b.dataset.v;
 const pickStatus=e=>{if(e.target.closest("[data-u]")){urgF=!urgF;render();return}const s=e.target.closest("[data-s]");if(s){statusF=statusF===s.dataset.s?"all":s.dataset.s;render()}};
 $("chips").onclick=pickStatus;$("stats").onclick=pickStatus;
 $("q").oninput=e=>{q=e.target.value;render()};
+$("qf").onclick=e=>{const b=e.target.closest("button");if(b){qf=b.dataset.v;savePrefs();render()}};
 $("pdvSel").onchange=e=>{pdvF=e.target.value;render()};
 $("main").onchange=e=>{
   if(e.target.dataset.act!=="st")return;
