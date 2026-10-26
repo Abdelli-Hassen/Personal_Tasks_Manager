@@ -578,7 +578,8 @@ const isUrgOpen=t=>t.urgent&&(t.status==="todo"||t.status==="wip");
 const matchStatus=t=>(statusF==="all"||(statusF==="fin"?isDone(t.status):t.status===statusF));
 const matchQ=t=>!q||norm(t.pdv+" "+t.task+" "+t.comment).includes(norm(q));
 const matchPdv=t=>!pdvF||t.pdv===pdvF;
-const scoped=()=>tasks.filter(t=>(urgF?isUrgOpen(t):inScope(t))&&matchPdv(t)&&matchQ(t));
+// une recherche en cours porte sur toutes les tâches, tous jours confondus
+const scoped=()=>tasks.filter(t=>(q.trim()||(urgF?isUrgOpen(t):inScope(t)))&&matchPdv(t)&&matchQ(t));
 
 /* ---------- rendu ---------- */
 function renderHero(items){
@@ -594,6 +595,7 @@ function renderHero(items){
     title="Semaine du "+fmt(a,{day:"numeric"})+" au "+fmt(b,{day:"numeric",month:"long",year:"numeric"});
   }
   if(urgF)title="🔥 Urgentes : à faire et en cours";
+  if(q.trim())title="Recherche : « "+q.trim()+" »";
   $("scopeTitle").textContent=title;
   const S=(k,v,l)=>`<button class="stat${statusF===k?" on":""}" data-s="${k}"><b>${v}</b><span>${l}</span></button>`;
   $("stats").innerHTML=S("all",n,"Total")+S("todo",td,"À faire")+S("wip",w,"En cours")+S("conf",c,"Confirmées")+S("fin",d,"Terminées");
@@ -650,7 +652,7 @@ function renderBoard(items){
   return `<div class="board">`+COLS.map(([k,l])=>{
     const c=items.filter(t=>colOf(t.status)===k);
     return `<div class="col" data-col="${k}"><h4>${l}<span>${c.length}</span></h4>${c.map(t=>
-      `<div class="card${isUrg(t)?" urgent":""}" draggable="true" data-id="${t.id}">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}<div>${esc(t.task)}</div>${t.comment?`<small>${esc(t.comment)}</small>`:""}${scope!=="day"?`<small>${fmt(t.date,{weekday:"short",day:"numeric",month:"short"})}${t.week?" · jour ?":""}</small>`:""}</div>`).join("")}</div>`;
+      `<div class="card${isUrg(t)?" urgent":""}" draggable="true" data-id="${t.id}">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}<div>${esc(t.task)}</div>${t.comment?`<small>${esc(t.comment)}</small>`:""}${scope!=="day"||q.trim()?`<small>${fmt(t.date,{weekday:"short",day:"numeric",month:"short"})}${t.week?" · jour ?":""}</small>`:""}</div>`).join("")}</div>`;
   }).join("")+`</div>`;
 }
 function render(){
