@@ -352,7 +352,7 @@ a.icon.mail:hover{background:var(--accent-soft);color:var(--accent)}
     <label>Situation<select name="status"></select></label>
     <label class="full">Tâche<input name="task" required placeholder="Que faut-il faire ?"></label>
     <label class="full">Commentaire<input name="comment" placeholder="optionnel"></label>
-    <label class="full">Lien e-mail<input name="link" type="url" pattern="https?://\S+" placeholder="Collez le lien du message (Outlook, Gmail…)  optionnel" title="Un lien commençant par http:// ou https://"></label>
+    <label class="full">Lien (e-mail ou fichier)<input name="link" type="url" pattern="https?://\S+" placeholder="Collez le lien d'un e-mail ou d'un fichier  optionnel" title="Un lien commençant par http:// ou https://"></label>
     <datalist id="pdvs"></datalist>
     <label class="full urgl"><input type="checkbox" name="urgent"><span class="fire">🔥</span><span class="ut on-t">Urgente : allumée, en haut de la liste</span><span class="ut off-t">Pas urgente : éteinte (cliquer pour allumer)</span></label>
     <div class="acts"><button type="button" class="btn" id="cancel">Annuler</button><button class="btn primary" id="ok">Ajouter</button></div>
@@ -391,6 +391,7 @@ const norm=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase(
 const BYLABEL=Object.fromEntries(Object.entries(STATUS).map(([k,v])=>[norm(v.label),k]));
 const DAYS=["dim","lun","mar","mer","jeu","ven","sam"];
 const pad=n=>String(n).padStart(2,"0");
+const linkIcon=u=>/outlook|office\.com|gmail|mail\./i.test(u)&&!/sharepoint|\.xlsx|\.docx/i.test(u)?"✉":"🔗";
 const safeUrl=u=>/^https?:\/\/\S+$/i.test(u||"")?u:"";
 const iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
 const parse=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
@@ -812,7 +813,7 @@ function taskHtml(t){
     <div class="t" data-act="edit">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.date&&t.time?`<span class="tm">${t.time}</span>`:""}${projTag(t)}${pdvTag(t)}${esc(t.task)}${t.week?`<span class="wk" title="Seule la semaine est connue. Modifiez la tâche pour fixer le jour.">jour ?</span>`:""}${t.comment?`<span class="c">${esc(t.comment)}</span>`:""}${period(t)?`<span class="per">✓ ${period(t)}</span>`:""}</div>
     <div class="right">
       <select class="badge ${s.cls}" data-act="st">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}"${k===t.status?" selected":""}>${v.label}</option>`).join("")}</select>
-      ${safeUrl(t.link)?`<a class="icon mail" href="${esc(t.link)}" target="_blank" rel="noopener noreferrer" title="Ouvrir l'e-mail">✉</a>`:""}
+      ${safeUrl(t.link)?`<a class="icon mail" href="${esc(t.link)}" target="_blank" rel="noopener noreferrer" title="Ouvrir le lien">${linkIcon(t.link)}</a>`:""}
       <button class="icon fire${t.urgent?" lit":""}" data-act="urg" title="${t.urgent?"Urgent : cliquer pour éteindre":"Pas urgent : cliquer pour allumer"}">🔥</button>
       <button class="icon" data-act="edit" title="Modifier">✎</button>
       ${view==="projects"?`<button class="icon" data-act="unproj" title="Retirer du projet (la tâche est conservée)">⊖</button>`:""}
@@ -838,7 +839,7 @@ function renderBoard(items){
   return `<div class="board">`+COLS.map(([k,l])=>{
     const c=items.filter(t=>colOf(t.status)===k);
     return `<div class="col" data-col="${k}"><h4>${l}<span>${c.length}</span></h4>${c.map(t=>
-      `<div class="card${isUrg(t)?" urgent":""}" draggable="true" data-id="${t.id}">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}<div>${esc(t.task)}</div>${t.comment?`<small>${esc(t.comment)}</small>`:""}${safeUrl(t.link)?`<small><a class="maillink" href="${esc(t.link)}" target="_blank" rel="noopener noreferrer">✉ Ouvrir l'e-mail</a></small>`:""}${period(t)?`<small style="color:var(--ok)">✓ ${period(t)}</small>`:""}${scope!=="day"||q.trim()?`<small>${fmt(t.date,{weekday:"short",day:"numeric",month:"short"})}${t.week?" · jour ?":""}</small>`:""}</div>`).join("")}</div>`;
+      `<div class="card${isUrg(t)?" urgent":""}" draggable="true" data-id="${t.id}">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}<div>${esc(t.task)}</div>${t.comment?`<small>${esc(t.comment)}</small>`:""}${safeUrl(t.link)?`<small><a class="maillink" href="${esc(t.link)}" target="_blank" rel="noopener noreferrer">${linkIcon(t.link)} Ouvrir le lien</a></small>`:""}${period(t)?`<small style="color:var(--ok)">✓ ${period(t)}</small>`:""}${scope!=="day"||q.trim()?`<small>${fmt(t.date,{weekday:"short",day:"numeric",month:"short"})}${t.week?" · jour ?":""}</small>`:""}</div>`).join("")}</div>`;
   }).join("")+`</div>`;
 }
 /* ---------- projets ---------- */
