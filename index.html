@@ -109,6 +109,7 @@ h1{font-size:26px;margin:0;letter-spacing:-.03em}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
 .pcard{text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;cursor:pointer;box-shadow:var(--shadow);display:grid;gap:6px}
 .pcard:hover{border-color:var(--accent)}
+.pcard.pdone{border-color:var(--ok)}.pcard.pdone b,.pcard.pdone span{color:var(--ok)}
 .pcard b{font-size:16px}.pcard span,.pcard small{color:var(--mute);font-size:12.5px}
 .pbar{display:block;height:6px;border-radius:3px;background:var(--line);overflow:hidden}.pbar u{display:block;height:100%;background:var(--ok)}
 .phead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}.phead h2{margin:0;font-size:22px;flex:1}
@@ -375,7 +376,7 @@ function fromCsv(text){
   const out=[],projs=[];let label=null,start=null;
   parseCsv(text,sep).forEach((r,i)=>{
     const [a,pdv,task,st,cm,dcol,tcol,ucol,fdate,ftime,from,proj]=r.map(x=>(x||"").trim());
-    if(a==="#PROJET"){projs.push({name:pdv});return}
+    if(a==="#PROJET"){projs.push({name:pdv,done:norm(st)==="termine",doneDate:parseDate(fdate)||""});return}
     if(i===0&&norm(task)==="tache")return;
     if(a&&!pdv&&!task){label=a;start=labelStart(a);return}
     if(!pdv&&!task)return;
@@ -395,7 +396,7 @@ function toCsv(){
   });
   const key=l=>labelStart(l)||"9999";
   const rows=[HEADER];
-  projects.forEach(p=>rows.push(["#PROJET",p.name,"","","","","","","","","",""]));
+  projects.forEach(p=>rows.push(["#PROJET",p.name,"",p.done?"Terminé":"","","","","",p.done&&p.doneDate||"","","",""]));
   [...groups.entries()].sort((x,y)=>key(x[0]).localeCompare(key(y[0]))).forEach(([label,list])=>{
     rows.push([label,"","","","","","","","","","",""]);
     [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":"",isDone(t.status)&&t.doneDate||"",isDone(t.status)&&t.doneDate&&t.doneTime||"",t.from||"",t.project||""]));
@@ -711,13 +712,17 @@ function renderBoard(items){
   }).join("")+`</div>`;
 }
 /* ---------- projets ---------- */
-function projInfo(name){
-  const l=tasks.filter(t=>t.project===name),done=l.filter(t=>isDone(t.status)).length;
-  const a=l.map(t=>t.from||t.date).filter(Boolean).sort()[0]||"",ends=l.map(doneOn).filter(Boolean).sort();
+// « terminé » pour un projet se décide à la main : des tâches toutes faites ne ferment pas le projet
+function projInfo(p){
+  const l=tasks.filter(t=>t.project===p.name),done=l.filter(t=>isDone(t.status)).length;
+  const a=l.map(t=>t.from||t.date).filter(Boolean).sort()[0]||"";
   const d=s=>fmt(s,{day:"numeric",month:"short"});
   let per=a?"Début "+d(a):"Aucune tâche";
-  if(a&&l.length===done&&ends.length){const b=ends[ends.length-1],n=Math.round((parse(b)-parse(a))/864e5);per+=" → Fini "+d(b)+(n>0?` (${n} j)`:"")}
-  else if(a)per+=" → en cours";
+  if(p.done){
+    const b=p.doneDate;
+    if(b&&a){const n=Math.round((parse(b)-parse(a))/864e5);per+=" → Fini "+d(b)+(n>0?` (${n} j)`:"")}
+    else if(b)per="Fini le "+d(b);
+  }else if(a)per+=" → en cours";
   return {l,done,per,pct:l.length?Math.round(done/l.length*100):0};
 }
 function renderProjects(){
@@ -725,13 +730,13 @@ function renderProjects(){
   if(!P){
     openProj=null;
     return `<div class="pnew"><input id="pName" placeholder="Nom du nouveau projet"><button class="btn primary" data-p-add>+ Projet</button></div>`+
-      (projects.length?`<div class="pgrid">`+projects.map(p=>{const i=projInfo(p.name);
-        return `<button class="pcard" data-p-open="${esc(p.name)}"><b>${esc(p.name)}</b><span>${i.done}/${i.l.length} terminées · ${i.pct}%</span><i class="pbar"><u style="width:${i.pct}%"></u></i><small>${i.per}</small></button>`}).join("")+`</div>`
+      (projects.length?`<div class="pgrid">`+[...projects].sort((a,b)=>!!a.done-!!b.done).map(p=>{const i=projInfo(p);
+        return `<button class="pcard${p.done?" pdone":""}" data-p-open="${esc(p.name)}"><b>${p.done?"✓ ":""}${esc(p.name)}</b><span>${p.done?"Projet terminé · ":""}${i.done}/${i.l.length} terminées · ${i.pct}%</span><i class="pbar"><u style="width:${i.pct}%"></u></i><small>${i.per}</small></button>`}).join("")+`</div>`
       :`<div class="empty"><b>Aucun projet</b>Donnez un nom à votre premier projet ci-dessus.</div>`);
   }
-  const i=projInfo(P.name),list=[...i.l].sort((a,b)=>isDone(a.status)-isDone(b.status)||byPrio(a,b));
-  return `<div class="phead"><button class="btn sm" data-p-back>← Projets</button><h2>📁 ${esc(P.name)}</h2><button class="btn sm" data-p-rename>Renommer</button><button class="btn sm" data-p-del>Supprimer</button></div>
-    <div class="pinfo">${i.done}/${i.l.length} terminées · ${i.pct}% · ${i.per}</div>
+  const i=projInfo(P),list=[...i.l].sort((a,b)=>isDone(a.status)-isDone(b.status)||byPrio(a,b));
+  return `<div class="phead"><button class="btn sm" data-p-back>← Projets</button><h2>${P.done?"✓":"📁"} ${esc(P.name)}</h2><button class="btn sm${P.done?"":" primary"}" data-p-done>${P.done?"↺ Rouvrir le projet":"✓ Marquer le projet terminé"}</button><button class="btn sm" data-p-rename>Renommer</button><button class="btn sm" data-p-del>Supprimer</button></div>
+    <div class="pinfo">${P.done?"Projet terminé":"Projet en cours"} · ${i.done}/${i.l.length} terminées · ${i.pct}% · ${i.per}</div>
     <h3 class="ghead">Tâches du projet<span style="margin-left:auto;display:flex;gap:6px"><button class="btn sm" data-p-pick>+ Tâches existantes</button><button class="btn sm primary" data-p-new>+ Nouvelle tâche</button></span></h3>`+
     (list.length?list.map(taskHtml).join(""):`<div class="empty"><b>Aucune tâche</b>Ajoutez des tâches déjà faites ou assignées, ou créez-en une nouvelle. Sans jour, une tâche reste dans le projet seulement.</div>`);
 }
@@ -747,7 +752,10 @@ function projectAction(b){
   else if(has("data-p-add"))addProject();
   else if(has("data-p-new"))openForm();
   else if(has("data-p-pick"))openPick();
-  else if(has("data-p-rename")){
+  else if(has("data-p-done")){
+    const p=projects.find(x=>x.name===openProj);
+    p.done=!p.done;p.doneDate=p.done?todayIso:"";save();render();
+  }else if(has("data-p-rename")){
     const n=(prompt("Nouveau nom du projet",openProj)||"").trim().replace(/\s+/g," ");
     if(!n||n===openProj)return;
     if(projects.some(p=>p.name!==openProj&&pkey(p.name)===pkey(n)))return toast("Ce nom existe déjà");
@@ -859,7 +867,7 @@ $("main").onchange=e=>{
   setStatus(find(e.target.closest(".task").dataset.id),e.target.value);
 };
 $("main").onclick=e=>{
-  const pb=e.target.closest("[data-p-open],[data-p-back],[data-p-add],[data-p-new],[data-p-pick],[data-p-rename],[data-p-del]");
+  const pb=e.target.closest("[data-p-open],[data-p-back],[data-p-add],[data-p-new],[data-p-pick],[data-p-done],[data-p-rename],[data-p-del]");
   if(pb)return projectAction(pb);
   const c=e.target.closest("[data-carry]");
   if(c){
