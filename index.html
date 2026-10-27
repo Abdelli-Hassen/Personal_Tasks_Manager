@@ -278,6 +278,10 @@ dialog.ask{width:min(430px,92vw)}
 /* barre du haut : toujours alignée à droite, même quand elle passe sous le titre */
 .hr{margin-left:auto;justify-content:flex-end}
 @media (max-width:700px){.hr{justify-content:flex-start;margin-left:0}}
+a.icon.mail{text-decoration:none;color:var(--accent)}
+a.icon.mail:hover{background:var(--accent-soft);color:var(--accent)}
+.maillink{color:var(--accent);font-weight:600;text-decoration:none}
+.maillink:hover{text-decoration:underline}
 /* boutons plus grands (cibles faciles à cliquer) */
 .btn{padding:10px 18px;font-size:15px}
 .btn.primary{padding:11px 20px}
@@ -348,6 +352,7 @@ dialog.ask{width:min(430px,92vw)}
     <label>Situation<select name="status"></select></label>
     <label class="full">Tâche<input name="task" required placeholder="Que faut-il faire ?"></label>
     <label class="full">Commentaire<input name="comment" placeholder="optionnel"></label>
+    <label class="full">Lien e-mail<input name="link" type="url" pattern="https?://\S+" placeholder="Collez le lien du message (Outlook, Gmail…)  optionnel" title="Un lien commençant par http:// ou https://"></label>
     <datalist id="pdvs"></datalist>
     <label class="full urgl"><input type="checkbox" name="urgent"><span class="fire">🔥</span><span class="ut on-t">Urgente : allumée, en haut de la liste</span><span class="ut off-t">Pas urgente : éteinte (cliquer pour allumer)</span></label>
     <div class="acts"><button type="button" class="btn" id="cancel">Annuler</button><button class="btn primary" id="ok">Ajouter</button></div>
@@ -386,6 +391,7 @@ const norm=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase(
 const BYLABEL=Object.fromEntries(Object.entries(STATUS).map(([k,v])=>[norm(v.label),k]));
 const DAYS=["dim","lun","mar","mer","jeu","ven","sam"];
 const pad=n=>String(n).padStart(2,"0");
+const safeUrl=u=>/^https?:\/\/\S+$/i.test(u||"")?u:"";
 const iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
 const parse=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
 const fmt=(s,o)=>parse(s).toLocaleDateString("fr-FR",o);
@@ -458,7 +464,7 @@ function cleanPdvs(){
 }
 
 /* ---------- CSV <-> tâches ---------- */
-const HEADER=["Week-date","PDV","Tache","Situation","commentaire","Date","Heure","Urgent","Fait le","Heure fin","Depuis","Projet"];
+const HEADER=["Week-date","PDV","Tache","Situation","commentaire","Date","Heure","Urgent","Fait le","Heure fin","Depuis","Projet","Lien"];
 const NODAY="Sans jour (projets)";
 const isUrg=t=>t.urgent&&!isDone(t.status);
 // plus récent d'abord : heure décroissante (sans heure en dernier), puis les dernières ajoutées
@@ -492,14 +498,14 @@ function fromCsv(text){
   const sep=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?";":",";
   const out=[],projs=[];let label=null,start=null;
   parseCsv(text,sep).forEach((r,i)=>{
-    const [a,pdv,task,st,cm,dcol,tcol,ucol,fdate,ftime,from,proj]=r.map(x=>(x||"").trim());
+    const [a,pdv,task,st,cm,dcol,tcol,ucol,fdate,ftime,from,proj,lien]=r.map(x=>(x||"").trim());
     if(a==="#PROJET"){projs.push({name:pdv,done:norm(st)==="termine",doneDate:parseDate(fdate)||""});return}
     if(i===0&&norm(task)==="tache")return;
     if(a&&!pdv&&!task){label=a;start=labelStart(a);return}
     if(!pdv&&!task)return;
     const d=parseDate(dcol)||parseDate(a);
     const nod=!d&&label===NODAY;
-    out.push({id:uid(),project:proj||"",date:d||(nod?"":start||todayIso),week:!d&&!nod,weekLabel:d||nod?null:label,pdv,task,status:BYLABEL[norm(st)]||"todo",comment:cm||"",time:parseTime(tcol),urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||""),doneDate:isDone(BYLABEL[norm(st)]||"todo")?parseDate(fdate):null,doneTime:parseTime(ftime),from:parseDate(from)});
+    out.push({id:uid(),project:proj||"",link:safeUrl(lien),date:d||(nod?"":start||todayIso),week:!d&&!nod,weekLabel:d||nod?null:label,pdv,task,status:BYLABEL[norm(st)]||"todo",comment:cm||"",time:parseTime(tcol),urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||""),doneDate:isDone(BYLABEL[norm(st)]||"todo")?parseDate(fdate):null,doneTime:parseTime(ftime),from:parseDate(from)});
   });
   fromCsv.projects=projs;
   return out;
@@ -513,10 +519,10 @@ function toCsv(){
   });
   const key=l=>labelStart(l)||"9999";
   const rows=[HEADER];
-  projects.forEach(p=>rows.push(["#PROJET",p.name,"",p.done?"Terminé":"","","","","",p.done&&p.doneDate||"","","",""]));
+  projects.forEach(p=>rows.push(["#PROJET",p.name,"",p.done?"Terminé":"","","","","",p.done&&p.doneDate||"","","","",""]));
   [...groups.entries()].sort((x,y)=>key(x[0]).localeCompare(key(y[0]))).forEach(([label,list])=>{
-    rows.push([label,"","","","","","","","","","",""]);
-    [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":"",isDone(t.status)&&t.doneDate||"",isDone(t.status)&&t.doneDate&&t.doneTime||"",t.from||"",t.project||""]));
+    rows.push([label,"","","","","","","","","","","",""]);
+    [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":"",isDone(t.status)&&t.doneDate||"",isDone(t.status)&&t.doneDate&&t.doneTime||"",t.from||"",t.project||"",t.link||""]));
   });
   return "﻿"+rows.map(r=>r.map(cell).join(";")).join("\r\n")+"\r\n";
 }
@@ -668,7 +674,7 @@ const stamp=()=>iso(new Date());
 function flatRows(list){
   return [...list].sort((a,b)=>a.date.localeCompare(b.date)||byTime(a,b)).map(t=>({
     "Semaine":!t.date?"Sans jour":t.week&&t.weekLabel?t.weekLabel:weekLabel(t.date),
-    "Date":t.week?"":t.date,"Heure":t.time||"","Urgent":t.urgent?"Oui":"","Fini le":isDone(t.status)&&t.doneDate||"","Heure fin":isDone(t.status)&&t.doneDate&&t.doneTime||"","Projet":t.project||"","PDV":t.pdv,"Tâche":t.task,"Situation":STATUS[t.status].label,"Commentaire":t.comment}));
+    "Date":t.week?"":t.date,"Heure":t.time||"","Urgent":t.urgent?"Oui":"","Fini le":isDone(t.status)&&t.doneDate||"","Heure fin":isDone(t.status)&&t.doneDate&&t.doneTime||"","Projet":t.project||"","PDV":t.pdv,"Tâche":t.task,"Situation":STATUS[t.status].label,"Commentaire":t.comment,"Lien":t.link||""}));
 }
 function loadXlsx(){
   if(window.XLSX)return Promise.resolve();
@@ -682,7 +688,7 @@ function loadXlsx(){
 async function exportXlsx(list,name){
   try{await loadXlsx()}catch(e){return toast(e.message)}
   const rows=flatRows(list);
-  const ws=XLSX.utils.json_to_sheet(rows,{header:["Semaine","Date","Heure","Urgent","Fini le","Heure fin","Projet","PDV","Tâche","Situation","Commentaire"]});
+  const ws=XLSX.utils.json_to_sheet(rows,{header:["Semaine","Date","Heure","Urgent","Fini le","Heure fin","Projet","PDV","Tâche","Situation","Commentaire","Lien"]});
   ws["!cols"]=[{wch:22},{wch:12},{wch:8},{wch:8},{wch:12},{wch:9},{wch:18},{wch:18},{wch:60},{wch:12},{wch:34}];
   ws["!autofilter"]={ref:ws["!ref"]};
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Tâches");
@@ -806,6 +812,7 @@ function taskHtml(t){
     <div class="t" data-act="edit">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.date&&t.time?`<span class="tm">${t.time}</span>`:""}${projTag(t)}${pdvTag(t)}${esc(t.task)}${t.week?`<span class="wk" title="Seule la semaine est connue. Modifiez la tâche pour fixer le jour.">jour ?</span>`:""}${t.comment?`<span class="c">${esc(t.comment)}</span>`:""}${period(t)?`<span class="per">✓ ${period(t)}</span>`:""}</div>
     <div class="right">
       <select class="badge ${s.cls}" data-act="st">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}"${k===t.status?" selected":""}>${v.label}</option>`).join("")}</select>
+      ${safeUrl(t.link)?`<a class="icon mail" href="${esc(t.link)}" target="_blank" rel="noopener noreferrer" title="Ouvrir l'e-mail">✉</a>`:""}
       <button class="icon fire${t.urgent?" lit":""}" data-act="urg" title="${t.urgent?"Urgent : cliquer pour éteindre":"Pas urgent : cliquer pour allumer"}">🔥</button>
       <button class="icon" data-act="edit" title="Modifier">✎</button>
       ${view==="projects"?`<button class="icon" data-act="unproj" title="Retirer du projet (la tâche est conservée)">⊖</button>`:""}
@@ -831,7 +838,7 @@ function renderBoard(items){
   return `<div class="board">`+COLS.map(([k,l])=>{
     const c=items.filter(t=>colOf(t.status)===k);
     return `<div class="col" data-col="${k}"><h4>${l}<span>${c.length}</span></h4>${c.map(t=>
-      `<div class="card${isUrg(t)?" urgent":""}" draggable="true" data-id="${t.id}">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}<div>${esc(t.task)}</div>${t.comment?`<small>${esc(t.comment)}</small>`:""}${period(t)?`<small style="color:var(--ok)">✓ ${period(t)}</small>`:""}${scope!=="day"||q.trim()?`<small>${fmt(t.date,{weekday:"short",day:"numeric",month:"short"})}${t.week?" · jour ?":""}</small>`:""}</div>`).join("")}</div>`;
+      `<div class="card${isUrg(t)?" urgent":""}" draggable="true" data-id="${t.id}">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}<div>${esc(t.task)}</div>${t.comment?`<small>${esc(t.comment)}</small>`:""}${safeUrl(t.link)?`<small><a class="maillink" href="${esc(t.link)}" target="_blank" rel="noopener noreferrer">✉ Ouvrir l'e-mail</a></small>`:""}${period(t)?`<small style="color:var(--ok)">✓ ${period(t)}</small>`:""}${scope!=="day"||q.trim()?`<small>${fmt(t.date,{weekday:"short",day:"numeric",month:"short"})}${t.week?" · jour ?":""}</small>`:""}</div>`).join("")}</div>`;
   }).join("")+`</div>`;
 }
 /* ---------- projets ---------- */
@@ -960,7 +967,7 @@ function openForm(t){
   f.project.innerHTML=`<option value="">Aucun</option>`+projects.map(p=>`<option>${esc(p.name)}</option>`).join("");
   f.project.value=t?(t.project||""):(inP&&openProj||"");syncReq();
   f.date.value=t?t.date:(inP||scope==="all"?todayIso:sel);f.pdv.value=t?t.pdv:(inP?"":pdvF);f.task.value=t?t.task:"";
-  f.comment.value=t?t.comment:"";f.status.value=t?t.status:"todo";f.urgent.checked=!!(t&&t.urgent);
+  f.comment.value=t?t.comment:"";f.link.value=t?(t.link||""):"";f.status.value=t?t.status:"todo";f.urgent.checked=!!(t&&t.urgent);
   f.time.value=t?(t.time||""):new Date().toTimeString().slice(0,5);
   timeTouched=!!t;
   dlg.showModal();(t?f.task:f.pdv).focus();
@@ -969,7 +976,7 @@ $("new").onclick=()=>openForm();
 $("cancel").onclick=()=>dlg.close();
 f.onsubmit=e=>{
   if(!f.checkValidity())return;
-  const v={date:f.date.value,pdv:f.pdv.value.trim(),task:f.task.value.trim(),comment:f.comment.value.trim(),status:f.status.value,time:f.time.value,urgent:f.urgent.checked,week:false,weekLabel:null,project:f.project.value};
+  const v={date:f.date.value,pdv:f.pdv.value.trim(),task:f.task.value.trim(),comment:f.comment.value.trim(),link:safeUrl(f.link.value.trim()),status:f.status.value,time:f.time.value,urgent:f.urgent.checked,week:false,weekLabel:null,project:f.project.value};
   if(!v.date)v.from=(editId&&(find(editId).from||find(editId).date))||todayIso;
   // heure laissée telle quelle = l'heure de l'enregistrement, pas celle de l'ouverture du formulaire
   if(!editId&&!timeTouched)v.time=new Date().toTimeString().slice(0,5);
