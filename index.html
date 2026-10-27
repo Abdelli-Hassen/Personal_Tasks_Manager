@@ -282,6 +282,11 @@ a.icon.mail{text-decoration:none;color:var(--accent)}
 a.icon.mail:hover{background:var(--accent-soft);color:var(--accent)}
 .maillink{color:var(--accent);font-weight:600;text-decoration:none}
 .maillink:hover{text-decoration:underline}
+.pcard{position:relative}
+.pcard b{padding-right:52px}
+.pcard .pfire{position:absolute;top:8px;right:8px}
+.pcard .ub{color:#fff;font-size:10.5px}
+.pcard.urgent{border-color:var(--err);background:color-mix(in srgb,var(--err) 8%,var(--card))}
 /* boutons plus grands (cibles faciles à cliquer) */
 .btn{padding:10px 18px;font-size:15px}
 .btn.primary{padding:11px 20px}
@@ -500,7 +505,7 @@ function fromCsv(text){
   const out=[],projs=[];let label=null,start=null;
   parseCsv(text,sep).forEach((r,i)=>{
     const [a,pdv,task,st,cm,dcol,tcol,ucol,fdate,ftime,from,proj,lien]=r.map(x=>(x||"").trim());
-    if(a==="#PROJET"){projs.push({name:pdv,done:norm(st)==="termine",doneDate:parseDate(fdate)||""});return}
+    if(a==="#PROJET"){projs.push({name:pdv,done:norm(st)==="termine",doneDate:parseDate(fdate)||"",urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||"")});return}
     if(i===0&&norm(task)==="tache")return;
     if(a&&!pdv&&!task){label=a;start=labelStart(a);return}
     if(!pdv&&!task)return;
@@ -520,7 +525,7 @@ function toCsv(){
   });
   const key=l=>labelStart(l)||"9999";
   const rows=[HEADER];
-  projects.forEach(p=>rows.push(["#PROJET",p.name,"",p.done?"Terminé":"","","","","",p.done&&p.doneDate||"","","","",""]));
+  projects.forEach(p=>rows.push(["#PROJET",p.name,"",p.done?"Terminé":"","","","",p.urgent?"Oui":"",p.done&&p.doneDate||"","","","",""]));
   [...groups.entries()].sort((x,y)=>key(x[0]).localeCompare(key(y[0]))).forEach(([label,list])=>{
     rows.push([label,"","","","","","","","","","","",""]);
     [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":"",isDone(t.status)&&t.doneDate||"",isDone(t.status)&&t.doneDate&&t.doneTime||"",t.from||"",t.project||"",t.link||""]));
@@ -843,6 +848,8 @@ function renderBoard(items){
   }).join("")+`</div>`;
 }
 /* ---------- projets ---------- */
+// un projet urgent n'est « allumé » que tant qu'il n'est pas terminé (comme une tâche)
+const pUrg=p=>!!(p.urgent&&!p.done);
 // « terminé » pour un projet se décide à la main : des tâches toutes faites ne ferment pas le projet
 function projInfo(p){
   const l=tasks.filter(t=>t.project===p.name),done=l.filter(t=>isDone(t.status)).length;
@@ -861,12 +868,12 @@ function renderProjects(){
   if(!P){
     openProj=null;
     return `<div class="pnew"><input id="pName" placeholder="Nom du nouveau projet"><button class="btn primary" data-p-add>+ Projet</button></div>`+
-      (projects.length?`<div class="pgrid">`+[...projects].sort((a,b)=>!!a.done-!!b.done).map(p=>{const i=projInfo(p);
-        return `<button class="pcard${p.done?" pdone":""}" data-p-open="${esc(p.name)}"><b>${p.done?"✓ ":""}${esc(p.name)}</b><span>${p.done?"Projet terminé · ":""}${i.done}/${i.l.length} terminées · ${i.pct}%</span><i class="pbar"><u style="width:${i.pct}%"></u></i><small>${i.per}</small></button>`}).join("")+`</div>`
+      (projects.length?`<div class="pgrid">`+[...projects].sort((a,b)=>(+!!a.done)-(+!!b.done)||(+pUrg(b))-(+pUrg(a))).map(p=>{const i=projInfo(p);
+        return `<div class="pcard${p.done?" pdone":""}${pUrg(p)?" urgent":""}" role="button" tabindex="0" data-p-open="${esc(p.name)}"><button class="icon fire pfire${p.urgent?" lit":""}" data-p-urg="${esc(p.name)}" title="${p.urgent?"Urgent : cliquer pour éteindre":"Pas urgent : cliquer pour allumer"}">🔥</button><b>${pUrg(p)?`<span class="ub">URGENT</span>`:""}${p.done?"✓ ":""}${esc(p.name)}</b><span>${p.done?"Projet terminé · ":""}${i.done}/${i.l.length} terminées · ${i.pct}%</span><i class="pbar"><u style="width:${i.pct}%"></u></i><small>${i.per}</small></div>`}).join("")+`</div>`
       :`<div class="empty"><b>Aucun projet</b>Donnez un nom à votre premier projet ci-dessus.</div>`);
   }
   const i=projInfo(P),list=[...i.l].sort((a,b)=>isDone(a.status)-isDone(b.status)||byPrio(a,b));
-  return `<div class="phead"><button class="btn sm" data-p-back>← Projets</button><h2>${P.done?"✓":"📁"} ${esc(P.name)}</h2><button class="btn sm${P.done?"":" primary"}" data-p-done>${P.done?"↺ Rouvrir le projet":"✓ Marquer le projet terminé"}</button><button class="btn sm" data-p-rename>Renommer</button><button class="btn sm" data-p-del>Supprimer</button></div>
+  return `<div class="phead"><button class="btn sm" data-p-back>← Projets</button><h2>${P.done?"✓":"📁"} ${esc(P.name)}</h2><button class="btn sm${P.done?"":" primary"}" data-p-done>${P.done?"↺ Rouvrir le projet":"✓ Marquer le projet terminé"}</button><button class="btn sm${P.urgent?" danger":""}" data-p-urg="${esc(P.name)}">🔥 ${P.urgent?"Urgent : éteindre":"Marquer urgent"}</button><button class="btn sm" data-p-rename>Renommer</button><button class="btn sm" data-p-del>Supprimer</button></div>
     <div class="pinfo">${P.done?"Projet terminé":"Projet en cours"} · ${i.done}/${i.l.length} terminées · ${i.pct}% · ${i.per}</div>
     <h3 class="ghead">Tâches du projet<span style="margin-left:auto;display:flex;gap:6px"><button class="btn sm" data-p-pick>+ Tâches existantes</button><button class="btn sm primary" data-p-new>+ Nouvelle tâche</button></span></h3>`+
     (list.length?list.map(taskHtml).join(""):`<div class="empty"><b>Aucune tâche</b>Ajoutez des tâches déjà faites ou assignées, ou créez-en une nouvelle. Videz le jour pour qu'une tâche reste dans le projet seulement.</div>`);
@@ -884,7 +891,10 @@ function projectAction(b){
   else if(has("data-p-add"))addProject();
   else if(has("data-p-new"))openForm();
   else if(has("data-p-pick"))openPick();
-  else if(has("data-p-done")){
+  else if(has("data-p-urg")){
+    const p=projects.find(x=>x.name===b.dataset.pUrg);
+    if(p){p.urgent=!p.urgent;save();render()}
+  }else if(has("data-p-done")){
     const p=projects.find(x=>x.name===openProj);
     p.done=!p.done;p.doneDate=p.done?todayIso:"";save();render();
   }else if(has("data-p-rename")){
@@ -925,7 +935,8 @@ $("pform").onsubmit=()=>{
 };
 function render(){
   document.body.classList.toggle("pv",view==="projects");
-  $("projBtn").textContent=view==="projects"?"📅 Jours":"📁 Projets";
+  const nu=projects.filter(pUrg).length;
+  $("projBtn").textContent=view==="projects"?"📅 Jours":"📁 Projets"+(nu?` · 🔥${nu}`:"");
   if(view==="projects"){
     const keep=$("pName")?$("pName").value:"";
     $("main").innerHTML=renderProjects();
@@ -1016,7 +1027,7 @@ $("main").onchange=e=>{
   setStatus(find(e.target.closest(".task").dataset.id),e.target.value);
 };
 $("main").onclick=e=>{
-  const pb=e.target.closest("[data-p-open],[data-p-back],[data-p-add],[data-p-new],[data-p-pick],[data-p-done],[data-p-rename],[data-p-del]");
+  const pb=e.target.closest("[data-p-open],[data-p-back],[data-p-add],[data-p-new],[data-p-pick],[data-p-done],[data-p-urg],[data-p-rename],[data-p-del]");
   if(pb)return projectAction(pb);
   const c=e.target.closest("[data-carry]");
   if(c){
@@ -1053,7 +1064,10 @@ $("main").addEventListener("dragend",()=>{dragId=null;document.querySelectorAll(
 $("main").addEventListener("dblclick",e=>{const c=e.target.closest(".card");if(c)openForm(find(c.dataset.id))});
 
 $("projBtn").onclick=()=>{view=view==="projects"?"days":"projects";render();if($("pName"))$("pName").focus()};
-$("main").addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="pName"){e.preventDefault();addProject()}});
+$("main").addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&e.target.id==="pName"){e.preventDefault();addProject()}
+  if(e.key==="Enter"&&e.target.classList.contains("pcard")){e.preventDefault();e.target.click()}
+});
 $("theme").onclick=()=>{
   const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme:dark)").matches;
   r.dataset.theme=dark?"light":"dark";savePrefs();
