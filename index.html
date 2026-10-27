@@ -6,19 +6,19 @@
 <title>Suivi des tâches</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#2f49e0">
+<meta name="theme-color" content="#4f46e5">
 <style>
 :root{
-  --bg:#e8ecf5;--bg2:#d6dff5;--card:#fff;--ink:#0d1220;--mute:#465069;--line:#c3cce0;
-  --accent:#2f49e0;--accent2:#6a45e8;--accent-soft:#d7defd;--solid:#2f49e0;--solid2:#6a45e8;--pl:26%;--shadow:0 1px 0 rgba(20,30,70,.06),0 2px 8px rgba(20,30,70,.12);
-  --ok:#0a6b38;--ok-bg:#c4ecd5;--wip:#8a4b00;--wip-bg:#ffdf9c;--todo:#38415a;--todo-bg:#d9deec;--conf:#5a22a8;--conf-bg:#e0cffa;--err:#c42b2b;
+  --bg:#eef1f8;--bg2:#e0e7f8;--card:#fff;--ink:#0f172a;--mute:#566079;--line:#dbe1ee;
+  --accent:#4f46e5;--accent2:#7c3aed;--accent-soft:#e6e8ff;--solid:#4f46e5;--solid2:#7c3aed;--pl:28%;--shadow:0 1px 2px rgba(15,23,42,.05),0 4px 14px rgba(15,23,42,.07);
+  --ok:#0b7a43;--ok-bg:#d2f1e1;--wip:#955500;--wip-bg:#ffeab8;--todo:#434d68;--todo-bg:#e4e8f2;--conf:#6a2cc2;--conf-bg:#eadffc;--err:#d62f2f;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){
-  --bg:#0f121a;--bg2:#161b2b;--card:#1a1f2b;--ink:#e8ebf3;--mute:#8d97ad;--line:#2a3142;--accent:#7f95ff;--accent2:#a48bff;--accent-soft:#252d50;--solid:#3d52d6;--solid2:#6140d0;--pl:78%;--shadow:none;
-  --ok:#4cc98b;--ok-bg:#153227;--wip:#f1b44f;--wip-bg:#3a2d12;--todo:#a4adc1;--todo-bg:#272d3b;--conf:#bd95f6;--conf-bg:#2d2347;--err:#ff7b7b}}
+  --bg:#0b0e16;--bg2:#131830;--card:#161b29;--ink:#e9ecf5;--mute:#8f9ab4;--line:#262d42;--accent:#8b9bff;--accent2:#b49bff;--accent-soft:#222a4d;--solid:#5b61f0;--solid2:#8b5cf6;--pl:78%;--shadow:0 1px 2px rgba(0,0,0,.3);
+  --ok:#4fd093;--ok-bg:#123327;--wip:#f4b950;--wip-bg:#3a2d12;--todo:#a7b0c6;--todo-bg:#242a3a;--conf:#c1a0f8;--conf-bg:#2c2347;--err:#ff7b7b}}
 :root[data-theme=dark]{
-  --bg:#0f121a;--bg2:#161b2b;--card:#1a1f2b;--ink:#e8ebf3;--mute:#8d97ad;--line:#2a3142;--accent:#7f95ff;--accent2:#a48bff;--accent-soft:#252d50;--solid:#3d52d6;--solid2:#6140d0;--pl:78%;--shadow:none;
-  --ok:#4cc98b;--ok-bg:#153227;--wip:#f1b44f;--wip-bg:#3a2d12;--todo:#a4adc1;--todo-bg:#272d3b;--conf:#bd95f6;--conf-bg:#2d2347;--err:#ff7b7b}
+  --bg:#0b0e16;--bg2:#131830;--card:#161b29;--ink:#e9ecf5;--mute:#8f9ab4;--line:#262d42;--accent:#8b9bff;--accent2:#b49bff;--accent-soft:#222a4d;--solid:#5b61f0;--solid2:#8b5cf6;--pl:78%;--shadow:0 1px 2px rgba(0,0,0,.3);
+  --ok:#4fd093;--ok-bg:#123327;--wip:#f4b950;--wip-bg:#3a2d12;--todo:#a7b0c6;--todo-bg:#242a3a;--conf:#c1a0f8;--conf-bg:#2c2347;--err:#ff7b7b}
 *{box-sizing:border-box}
 body{margin:0;color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg) linear-gradient(180deg,var(--bg2),var(--bg) 340px) no-repeat;min-height:100vh}
 .wrap{max-width:1120px;margin:0 auto;padding:22px 16px 90px}
@@ -206,6 +206,76 @@ dialog .acts{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
   .board{grid-template-columns:repeat(4,240px)}
   dialog form{grid-template-columns:1fr}
 }
+/* ---------- refonte visuelle ---------- */
+::selection{background:color-mix(in srgb,var(--accent) 28%,transparent)}
+html{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+body{-webkit-font-smoothing:antialiased}
+h1{font-size:28px;font-weight:800;letter-spacing:-.04em}
+.sub{font-weight:500}
+input,select,textarea{border-radius:12px;padding:9px 12px;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 24%,transparent)}
+.btn{border-radius:12px;font-weight:550;transition:transform .12s,box-shadow .15s,border-color .15s,filter .15s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(20,30,70,.12)}
+.btn:active{transform:none}
+.btn:focus-visible,.chip:focus-visible,.day:focus-visible,.chk:focus-visible,.icon:focus-visible,.pcard:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{box-shadow:0 4px 14px color-mix(in srgb,var(--solid) 38%,transparent)}
+.btn.primary:hover{box-shadow:0 6px 18px color-mix(in srgb,var(--solid) 46%,transparent);filter:brightness(1.07)}
+.btn.danger{background:var(--err);border:0;color:#fff;font-weight:600;padding:9px 16px}
+.btn.sm{border-radius:10px}
+.pill{box-shadow:var(--shadow)}
+.hero{border-radius:24px;padding:22px 26px;background:linear-gradient(135deg,var(--card),color-mix(in srgb,var(--accent-soft) 45%,var(--card)))}
+.ring,.ring svg{width:104px;height:104px}
+.ring b{font-size:24px;font-weight:800}
+.scope-title{font-size:19px;font-weight:750;letter-spacing:-.02em}
+.stat{border-radius:16px;background:color-mix(in srgb,var(--bg) 70%,var(--card));transition:transform .15s,background .15s}
+.stat:hover{transform:translateY(-1px)}
+.stat.on{background:linear-gradient(135deg,var(--solid),var(--solid2));box-shadow:0 6px 16px color-mix(in srgb,var(--solid) 34%,transparent)}
+.stat b{font-weight:800}
+.day{border-radius:18px;transition:transform .15s,border-color .15s}
+.day:hover{transform:translateY(-2px)}
+.day.sel{background:linear-gradient(160deg,var(--solid),var(--solid2));box-shadow:0 8px 20px color-mix(in srgb,var(--solid) 36%,transparent)}
+.seg{border-radius:14px;box-shadow:var(--shadow)}
+.seg button{border-radius:10px;transition:background .15s,color .15s;font-weight:550}
+.seg button.on{background:linear-gradient(135deg,var(--solid),var(--solid2))}
+.chip{transition:border-color .15s,color .15s;font-weight:550}
+.chip:hover{border-color:var(--accent);color:var(--ink)}
+.group{margin-bottom:26px}
+.ghead{font-size:16px;font-weight:750;letter-spacing:-.02em}
+.task{border-radius:18px;padding:12px 16px;border-left-width:5px;transition:transform .15s,box-shadow .15s}
+.task:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(20,30,70,.13)}
+.chk{width:24px;height:24px;transition:transform .15s,background .15s,border-color .15s}
+.chk:hover{transform:scale(1.12);background:var(--ok-bg)}
+.done .chk:hover{background:var(--ok)}
+.badge{padding:6px 12px}
+.icon{transition:color .15s,background .15s,opacity .15s}
+.tm,.pdv,.prj,.dj,.ub{border-radius:8px}
+.card{border-radius:14px;transition:transform .15s,box-shadow .15s}
+.card:hover{transform:translateY(-2px)}
+.col{border-radius:20px}
+.empty{border:1px dashed var(--line);border-radius:20px;background:color-mix(in srgb,var(--card) 70%,transparent)}
+.pcard{border-radius:20px;transition:transform .15s,box-shadow .15s,border-color .15s}
+.pcard:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(20,30,70,.14)}
+.pnew input{border-radius:14px;padding:11px 14px}
+.menubox{border-radius:16px;padding:8px}
+.connect{border-radius:24px}
+/* fenêtres */
+dialog{border:1px solid var(--line);border-radius:24px;width:min(540px,94vw);box-shadow:0 30px 80px rgba(8,12,30,.35);animation:pop .18s ease-out}
+dialog::backdrop{background:rgba(10,14,30,.5);backdrop-filter:blur(6px);animation:fade .18s}
+@keyframes pop{from{opacity:0;transform:translateY(10px) scale(.97)}}
+@keyframes fade{from{opacity:0}}
+dialog form{padding:26px;gap:14px}
+dialog h2{font-size:20px;font-weight:800;letter-spacing:-.03em}
+dialog label{font-size:12px;font-weight:650;letter-spacing:.02em;text-transform:uppercase}
+dialog label input,dialog label select{text-transform:none;letter-spacing:0;font-weight:400;font-size:15px}
+dialog .acts{padding-top:6px}
+dialog .pk,dialog .urgl{text-transform:none;letter-spacing:0;font-weight:500}
+dialog.ask{width:min(430px,92vw)}
+.askbox{padding:26px;display:grid;gap:14px}
+.askbox h2{margin:0;font-size:20px;font-weight:800;letter-spacing:-.03em}
+.askbox p{margin:0;color:var(--mute);white-space:pre-line}
+.askbox .acts{display:flex;justify-content:flex-end;gap:8px;padding-top:6px}
+.toast{border-radius:16px;padding:12px 18px;animation:pop .2s ease-out;font-weight:550}
+@media (prefers-reduced-motion:reduce){*,::before,::after{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
@@ -263,6 +333,14 @@ dialog .acts{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
     <div class="acts"><button type="button" class="btn" id="cancel">Annuler</button><button class="btn primary" id="ok">Ajouter</button></div>
   </form>
 </dialog>
+<dialog id="ask" class="ask">
+  <div class="askbox">
+    <h2 id="askTitle"></h2>
+    <p id="askMsg"></p>
+    <input id="askInput" hidden>
+    <div class="acts"><button type="button" class="btn" id="askCancel">Annuler</button><button type="button" class="btn primary" id="askOk">OK</button></div>
+  </div>
+</dialog>
 <dialog id="pick">
   <form method="dialog" id="pform">
     <h2>Ajouter des tâches existantes</h2>
@@ -307,6 +385,25 @@ function weekRange(s){
   return [p+pad(a),p+pad(Math.min(a+6,last))];
 }
 const weekLabel=s=>{const [a,b]=weekRange(s);return short(a)+" -> "+short(b)};
+
+/* ---------- fenêtre de confirmation / saisie (remplace confirm et prompt) ---------- */
+// ask({title,msg,ok,cancel,danger}) -> true/false ; avec input:"valeur" -> texte saisi, ou null si annulé
+function ask({title,msg="",input,ok="OK",cancel="Annuler",danger=false}){
+  return new Promise(res=>{
+    const d=$("ask"),i=$("askInput"),b=$("askOk"),c=$("askCancel"),typed=input!==undefined;
+    let val=typed?null:false;
+    $("askTitle").textContent=title;$("askMsg").textContent=msg;$("askMsg").hidden=!msg;
+    i.hidden=!typed;i.value=input??"";
+    b.textContent=ok;c.textContent=cancel;b.className="btn "+(danger?"danger":"primary");
+    const done=v=>{val=v;d.close()};
+    b.onclick=()=>done(typed?i.value:true);
+    c.onclick=()=>d.close();
+    i.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();b.click()}};
+    d.onclose=()=>res(val);
+    d.showModal();
+    (typed?i:danger?c:b).focus();if(typed)i.select();
+  });
+}
 
 /* ---------- état ---------- */
 const KEY="suivi-taches-v2";
@@ -478,7 +575,7 @@ async function loadFromFile(first,keepSel){
   const f=await handle.getFile();lastMod=f.lastModified;
   const loaded=fromCsv(await readText(f)),lp=fromCsv.projects;
   if(loaded.length||lp.length){
-    if(first&&tasks.length&&!confirm(`Charger les ${loaded.length} tâches du fichier ?\n\nOK = utiliser le fichier\nAnnuler = garder les ${tasks.length} tâches de cette page et écraser le fichier`)){
+    if(first&&tasks.length&&!await ask({title:`Charger les ${loaded.length} tâches du fichier ?`,msg:`« Utiliser le fichier » remplace les ${tasks.length} tâches de cette page. « Garder la page » écrase le fichier avec les tâches de cette page.`,ok:"Utiliser le fichier",cancel:"Garder la page"})){
       return writeNow();
     }
     tasks=loaded;projects=lp;ensureProjects();const fixed=cleanPdvs();persistLocal();
@@ -524,7 +621,7 @@ async function syncOnFocus(){
     if(f.lastModified!==lastMod){
       if(dirty){
         asking=true;
-        const load=confirm("Le fichier a été modifié ailleurs (Excel ?) alors que la page a des changements non enregistrés.\n\nOK = charger la version du fichier (changements de la page perdus)\nAnnuler = garder la page et écraser le fichier");
+        const load=await ask({title:"Fichier modifié ailleurs",msg:"Le fichier a changé (Excel ?) alors que la page a des changements non enregistrés. Charger le fichier fait perdre ceux de la page ; garder la page écrase le fichier.",ok:"Charger le fichier",cancel:"Garder la page"});
         asking=false;
         if(!load)return writeNow();
       }
@@ -757,16 +854,21 @@ function projectAction(b){
     const p=projects.find(x=>x.name===openProj);
     p.done=!p.done;p.doneDate=p.done?todayIso:"";save();render();
   }else if(has("data-p-rename")){
-    const n=(prompt("Nouveau nom du projet",openProj)||"").trim().replace(/\s+/g," ");
-    if(!n||n===openProj)return;
-    if(projects.some(p=>p.name!==openProj&&pkey(p.name)===pkey(n)))return toast("Ce nom existe déjà");
-    projects.find(p=>p.name===openProj).name=n;tasks.forEach(t=>{if(t.project===openProj)t.project=n});
-    openProj=n;save();render();
+    const o=openProj;
+    ask({title:"Renommer le projet",input:o,ok:"Renommer"}).then(v=>{
+      const n=(v||"").trim().replace(/\s+/g," ");
+      if(!n||n===o)return;
+      if(projects.some(p=>p.name!==o&&pkey(p.name)===pkey(n)))return toast("Ce nom existe déjà");
+      projects.find(p=>p.name===o).name=n;tasks.forEach(t=>{if(t.project===o)t.project=n});
+      if(openProj===o)openProj=n;save();render();
+    });
   }else if(has("data-p-del")){
-    const n=tasks.filter(t=>t.project===openProj).length;
-    if(!confirm(`Supprimer le projet « ${openProj} » et ses ${n} tâche(s) ?`))return;
-    toast("Projet supprimé",true);
-    const o=openProj;tasks=tasks.filter(t=>t.project!==o);projects=projects.filter(p=>p.name!==o);openProj=null;save();render();
+    const o=openProj,n=tasks.filter(t=>t.project===o).length;
+    ask({title:`Supprimer « ${o} » ?`,msg:`Le projet et ses ${n} tâche(s) seront supprimés. Vous pourrez annuler juste après.`,ok:"Supprimer",danger:true}).then(yes=>{
+      if(!yes)return;
+      toast("Projet supprimé",true);
+      tasks=tasks.filter(t=>t.project!==o);projects=projects.filter(p=>p.name!==o);openProj=null;save();render();
+    });
   }
 }
 // tâches déjà créées (faites ou assignées) qui n'appartiennent à aucun projet
