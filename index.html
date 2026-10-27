@@ -102,7 +102,7 @@ h1{font-size:26px;margin:0;letter-spacing:-.03em}
 .c{display:block;color:var(--mute);font-size:13px;margin-top:1px}
 .pdv{display:inline-block;font-size:11.5px;font-weight:650;padding:2px 8px;border-radius:6px;margin-right:8px;vertical-align:1px;
   background:hsl(var(--h) 80% 50%/.14);color:hsl(var(--h) 60% var(--pl))}
-.per{display:block;color:var(--ok);font-size:12.5px;margin-top:2px;text-decoration:none}
+.per{display:inline-block;width:100%;color:var(--ok);font-size:12.5px;margin-top:2px}
 .wk{font-size:11px;color:var(--wip);background:var(--wip-bg);border-radius:6px;padding:1px 6px;margin-left:6px;cursor:help}
 .right{display:flex;gap:4px;align-items:center}
 .badge{border:0;border-radius:999px;padding:5px 10px;font-size:12.5px;font-weight:600;cursor:pointer;appearance:none;-webkit-appearance:none;text-align:center}
@@ -568,11 +568,14 @@ $("pillBtn2").onclick=async()=>{
 function labelEnd(l){const m=(l||"").match(/->\s*(\d{2})\/(\d{2})\/(\d{2})/);return m?`20${m[1]}-${m[2]}-${m[3]}`:null}
 // une tâche "semaine seulement" couvre toute la plage de sa semaine d'origine
 const range=t=>{const a=t.week&&labelStart(t.weekLabel),b=a&&labelEnd(t.weekLabel);return a&&b?[a,b]:[t.date,t.date]};
+// une tâche terminée un autre jour apparaît aussi le jour où elle a été terminée
+const doneOn=t=>isDone(t.status)&&t.doneDate||null;
 const inScope=t=>{
   if(scope==="all")return true;
-  if(scope==="day")return t.date===sel;
+  const d=doneOn(t);
+  if(scope==="day")return t.date===sel||d===sel;
   const [lo,hi]=weekRange(sel),[a,b]=range(t);
-  return a<=hi&&b>=lo;
+  return (a<=hi&&b>=lo)||(d&&d>=lo&&d<=hi);
 };
 let urgF=false;
 // filtre Urgentes : toutes les urgentes encore « À faire » ou « En cours », tous jours confondus
@@ -607,7 +610,7 @@ function renderHero(items){
 function renderStrip(){
   const [ws,we]=weekRange(sel);let h=`<button class="btn navb" data-w="-1">‹</button><div class="days">`;
   for(let s=ws;s<=we;s=addDays(s,1)){
-    const list=tasks.filter(t=>t.date===s),d=list.filter(t=>isDone(t.status)).length;
+    const list=tasks.filter(t=>t.date===s||doneOn(t)===s),d=list.filter(t=>isDone(t.status)).length;
     h+=`<div class="day${s===sel&&scope!=="all"?" sel":""}${s===todayIso?" today":""}" data-d="${s}">
       <small>${DAYS[parse(s).getDay()]}</small><strong>${parse(s).getDate()}</strong>
       <em>${list.length?d+"/"+list.length:"–"}</em><i><u style="width:${list.length?d/list.length*100:0}%"></u></i></div>`;
@@ -649,7 +652,7 @@ function taskHtml(t){
 }
 function renderList(items){
   if(!items.length)return `<div class="empty"><b>Aucune tâche ici</b>${tasks.length?"Changez de jour ou de filtre, ou ":""}cliquez sur « + Nouvelle tâche ».</div>`;
-  const wkKey=t=>t.week&&labelStart(t.weekLabel)?"W"+t.weekLabel:t.date;
+  const wkKey=t=>t.week&&labelStart(t.weekLabel)?"W"+t.weekLabel:(scope==="day"&&!q.trim()&&!urgF&&t.date!==sel&&doneOn(t)===sel?sel:t.date);
   const g={};[...items].sort(byPrio).forEach(t=>(g[wkKey(t)]??=[]).push(t));
   const sortKey=k=>k[0]==="W"?labelStart(k.slice(1)):k;
   return Object.keys(g).sort((a,b)=>sortKey(b).localeCompare(sortKey(a))).map(dt=>{
