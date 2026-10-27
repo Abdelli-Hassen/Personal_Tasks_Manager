@@ -238,7 +238,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .seg button{border-radius:10px;transition:background .15s,color .15s;font-weight:550}
 .seg button.on{background:linear-gradient(135deg,var(--solid),var(--solid2))}
 .chip{transition:border-color .15s,color .15s;font-weight:550}
-.chip:hover{border-color:var(--accent);color:var(--ink)}
+.chip:not(.on):hover{border-color:var(--accent);color:var(--ink)}
 .group{margin-bottom:26px}
 .ghead{font-size:16px;font-weight:750;letter-spacing:-.02em}
 .task{border-radius:18px;padding:12px 16px;border-left-width:5px;transition:transform .15s,box-shadow .15s}
