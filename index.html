@@ -741,7 +741,8 @@ function renderProjects(){
     (list.length?list.map(taskHtml).join(""):`<div class="empty"><b>Aucune tâche</b>Ajoutez des tâches déjà faites ou assignées, ou créez-en une nouvelle. Sans jour, une tâche reste dans le projet seulement.</div>`);
 }
 function addProject(){
-  const n=$("pName").value.trim().replace(/\s+/g," ");if(!n)return;
+  const n=$("pName").value.trim().replace(/\s+/g," ");
+  if(!n){toast("Écrivez d'abord le nom du projet");$("pName").focus();return}
   if(projects.some(p=>pkey(p.name)===pkey(n)))return toast("Ce projet existe déjà");
   projects.push({name:n});openProj=n;save();render();
 }
@@ -789,7 +790,12 @@ $("pform").onsubmit=()=>{
 function render(){
   document.body.classList.toggle("pv",view==="projects");
   $("projBtn").textContent=view==="projects"?"📅 Jours":"📁 Projets";
-  if(view==="projects"){$("main").innerHTML=renderProjects();return}
+  if(view==="projects"){
+    const keep=$("pName")?$("pName").value:"";
+    $("main").innerHTML=renderProjects();
+    if(keep&&$("pName"))$("pName").value=keep;
+    return;
+  }
   const base=scoped();
   renderHero(base);renderStrip();renderControls();
   const items=base.filter(matchStatus).sort(byRecent);
@@ -894,7 +900,7 @@ $("main").addEventListener("drop",e=>{
 $("main").addEventListener("dragend",()=>{dragId=null;document.querySelectorAll(".col").forEach(x=>x.classList.remove("over"))});
 $("main").addEventListener("dblclick",e=>{const c=e.target.closest(".card");if(c)openForm(find(c.dataset.id))});
 
-$("projBtn").onclick=()=>{view=view==="projects"?"days":"projects";render()};
+$("projBtn").onclick=()=>{view=view==="projects"?"days":"projects";render();if($("pName"))$("pName").focus()};
 $("main").addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="pName"){e.preventDefault();addProject()}});
 $("theme").onclick=()=>{
   const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme:dark)").matches;
