@@ -783,7 +783,8 @@ function taskHtml(t){
       <select class="badge ${s.cls}" data-act="st">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}"${k===t.status?" selected":""}>${v.label}</option>`).join("")}</select>
       <button class="icon fire${t.urgent?" lit":""}" data-act="urg" title="${t.urgent?"Urgent : cliquer pour éteindre":"Pas urgent : cliquer pour allumer"}">🔥</button>
       <button class="icon" data-act="edit" title="Modifier">✎</button>
-      <button class="icon" data-act="del" title="Supprimer">✕</button>
+      ${view==="projects"?`<button class="icon" data-act="unproj" title="Retirer du projet (la tâche est conservée)">⊖</button>`:""}
+      <button class="icon" data-act="del" title="${view==="projects"?"Supprimer définitivement la tâche":"Supprimer"}">✕</button>
     </div></div>`;
 }
 function renderList(items){
@@ -908,7 +909,7 @@ function render(){
 let snap=null,snapP=null,toastT=null;
 function toast(msg,undo){
   $("toastTxt").textContent=msg;$("toastBtn").hidden=!undo;$("toast").hidden=false;snap=undo?JSON.stringify(tasks):null;snapP=undo?JSON.stringify(projects):null;
-  clearTimeout(toastT);toastT=setTimeout(()=>$("toast").hidden=true,5500);
+  clearTimeout(toastT);toastT=setTimeout(()=>$("toast").hidden=true,undo?10000:5500);
 }
 $("toastBtn").onclick=()=>{if(snap){tasks=JSON.parse(snap);if(snapP)projects=JSON.parse(snapP);save();render()}$("toast").hidden=true};
 const find=id=>tasks.find(t=>t.id===id);
@@ -988,7 +989,16 @@ $("main").onclick=e=>{
   if(a.dataset.act==="edit")openForm(t);
   if(a.dataset.act==="urg"){t.urgent=!t.urgent;save();render()}
   if(a.dataset.act==="tick")setStatus(t,isDone(t.status)?"todo":"ok");
-  if(a.dataset.act==="del"){toast("Tâche supprimée",true);tasks=tasks.filter(x=>x!==t);save();render()}
+  if(a.dataset.act==="unproj"){
+    toast("Tâche retirée du projet (elle est conservée)",true);
+    t.project="";if(!t.date)t.date=t.from||todayIso;   // sans jour ni projet, elle disparaîtrait partout
+    save();render();
+  }
+  if(a.dataset.act==="del"){
+    const kill=()=>{toast("Tâche supprimée",true);tasks=tasks.filter(x=>x!==t);save();render()};
+    if(view==="projects")ask({title:"Supprimer cette tâche ?",msg:`« ${t.task} » sera supprimée définitivement. Pour la garder, utilisez « Retirer du projet » (⊖).`,ok:"Supprimer",danger:true}).then(y=>{if(y)kill()});
+    else kill();
+  }
 };
 // tableau : glisser-déposer pour changer la situation, double-clic pour modifier
 let dragId=null;
