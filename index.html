@@ -113,8 +113,12 @@ h1{font-size:26px;margin:0;letter-spacing:-.03em}
 .pbar{display:block;height:6px;border-radius:3px;background:var(--line);overflow:hidden}.pbar u{display:block;height:100%;background:var(--ok)}
 .phead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}.phead h2{margin:0;font-size:22px;flex:1}
 .pinfo{color:var(--mute);font-size:13px;margin-bottom:12px}
-.pnotes{display:grid;gap:4px;font-size:12.5px;color:var(--mute);margin-bottom:18px}
-.pnotes textarea{width:100%;resize:vertical;font-size:14px}
+.picklist{display:grid;gap:6px;max-height:50vh;overflow:auto}
+dialog .pk{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;color:var(--ink);font-size:14px;cursor:pointer}
+dialog .pk:hover{border-color:var(--accent)}
+dialog .pk input{flex:none}
+.pk .pkt{flex:1;min-width:0;word-break:break-word}
+.pk small{color:var(--mute);white-space:nowrap}
 .per{display:inline-block;width:100%;color:var(--ok);font-size:12.5px;margin-top:2px}
 .wk{font-size:11px;color:var(--wip);background:var(--wip-bg);border-radius:6px;padding:1px 6px;margin-left:6px;cursor:help}
 .right{display:flex;gap:4px;align-items:center}
@@ -258,6 +262,14 @@ dialog .acts{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
     <div class="acts"><button type="button" class="btn" id="cancel">Annuler</button><button class="btn primary" id="ok">Ajouter</button></div>
   </form>
 </dialog>
+<dialog id="pick">
+  <form method="dialog" id="pform">
+    <h2>Ajouter des tâches existantes</h2>
+    <input class="full" id="pickQ" type="search" placeholder="Rechercher une tâche, un PDV…">
+    <div class="full picklist" id="pickList"></div>
+    <div class="acts"><button type="button" class="btn" id="pickCancel">Annuler</button><button class="btn primary" id="pickOk">Ajouter</button></div>
+  </form>
+</dialog>
 <div class="toast" id="toast" hidden><span id="toastTxt"></span><button id="toastBtn">Annuler</button></div>
 
 <script>
@@ -363,7 +375,7 @@ function fromCsv(text){
   const out=[],projs=[];let label=null,start=null;
   parseCsv(text,sep).forEach((r,i)=>{
     const [a,pdv,task,st,cm,dcol,tcol,ucol,fdate,ftime,from,proj]=r.map(x=>(x||"").trim());
-    if(a==="#PROJET"){projs.push({name:pdv,notes:task});return}
+    if(a==="#PROJET"){projs.push({name:pdv});return}
     if(i===0&&norm(task)==="tache")return;
     if(a&&!pdv&&!task){label=a;start=labelStart(a);return}
     if(!pdv&&!task)return;
@@ -383,7 +395,7 @@ function toCsv(){
   });
   const key=l=>labelStart(l)||"9999";
   const rows=[HEADER];
-  projects.forEach(p=>rows.push(["#PROJET",p.name,p.notes,"","","","","","","","",""]));
+  projects.forEach(p=>rows.push(["#PROJET",p.name,"","","","","","","","","",""]));
   [...groups.entries()].sort((x,y)=>key(x[0]).localeCompare(key(y[0]))).forEach(([label,list])=>{
     rows.push([label,"","","","","","","","","","",""]);
     [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":"",isDone(t.status)&&t.doneDate||"",isDone(t.status)&&t.doneDate&&t.doneTime||"",t.from||"",t.project||""]));
@@ -480,7 +492,7 @@ async function loadFromFile(first,keepSel){
   else setFs("ok");
 }
 function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(tasks));localStorage.setItem("suivi-projets",JSON.stringify(projects))}catch(e){}}
-function ensureProjects(){tasks.forEach(t=>{if(t.project&&!projects.some(p=>p.name===t.project))projects.push({name:t.project,notes:""})})}
+function ensureProjects(){tasks.forEach(t=>{if(t.project&&!projects.some(p=>p.name===t.project))projects.push({name:t.project})})}
 function save(){
   persistLocal();
   if(!handle)return;
@@ -720,14 +732,13 @@ function renderProjects(){
   const i=projInfo(P.name),list=[...i.l].sort((a,b)=>isDone(a.status)-isDone(b.status)||byPrio(a,b));
   return `<div class="phead"><button class="btn sm" data-p-back>← Projets</button><h2>📁 ${esc(P.name)}</h2><button class="btn sm" data-p-rename>Renommer</button><button class="btn sm" data-p-del>Supprimer</button></div>
     <div class="pinfo">${i.done}/${i.l.length} terminées · ${i.pct}% · ${i.per}</div>
-    <label class="pnotes">Notes<textarea data-pnotes rows="4" placeholder="Objectifs, décisions, liens…">${esc(P.notes)}</textarea></label>
-    <h3 class="ghead">Tâches du projet<button class="btn sm primary" data-p-new>+ Tâche</button></h3>`+
-    (list.length?list.map(taskHtml).join(""):`<div class="empty"><b>Aucune tâche</b>Ajoutez la première avec « + Tâche ». Sans jour, elle reste dans le projet seulement.</div>`);
+    <h3 class="ghead">Tâches du projet<span style="margin-left:auto;display:flex;gap:6px"><button class="btn sm" data-p-pick>+ Tâches existantes</button><button class="btn sm primary" data-p-new>+ Nouvelle tâche</button></span></h3>`+
+    (list.length?list.map(taskHtml).join(""):`<div class="empty"><b>Aucune tâche</b>Ajoutez des tâches déjà faites ou assignées, ou créez-en une nouvelle. Sans jour, une tâche reste dans le projet seulement.</div>`);
 }
 function addProject(){
   const n=$("pName").value.trim().replace(/\s+/g," ");if(!n)return;
   if(projects.some(p=>pkey(p.name)===pkey(n)))return toast("Ce projet existe déjà");
-  projects.push({name:n,notes:""});openProj=n;save();render();
+  projects.push({name:n});openProj=n;save();render();
 }
 function projectAction(b){
   const has=a=>b.hasAttribute(a);
@@ -735,6 +746,7 @@ function projectAction(b){
   else if(has("data-p-back")){openProj=null;render()}
   else if(has("data-p-add"))addProject();
   else if(has("data-p-new"))openForm();
+  else if(has("data-p-pick"))openPick();
   else if(has("data-p-rename")){
     const n=(prompt("Nouveau nom du projet",openProj)||"").trim().replace(/\s+/g," ");
     if(!n||n===openProj)return;
@@ -748,6 +760,24 @@ function projectAction(b){
     const o=openProj;tasks=tasks.filter(t=>t.project!==o);projects=projects.filter(p=>p.name!==o);openProj=null;save();render();
   }
 }
+// tâches déjà créées (faites ou assignées) qui n'appartiennent à aucun projet
+let picked=new Set();
+function renderPick(){
+  const k=norm($("pickQ").value);
+  const l=tasks.filter(t=>!t.project&&(!k||norm(t.pdv+" "+t.task+" "+t.comment).includes(k))).sort(byRecent);
+  $("pickList").innerHTML=l.length?l.map(t=>`<label class="pk"><input type="checkbox" value="${t.id}"${picked.has(t.id)?" checked":""}><span class="pkt">${t.pdv?pdvTag(t):""}${esc(t.task)}</span><small>${t.date?fmt(t.date,{day:"numeric",month:"short"}):"sans jour"} · ${STATUS[t.status].label}</small></label>`).join("")
+    :`<div class="empty">${k?"Aucun résultat":"Toutes vos tâches sont déjà dans un projet"}</div>`;
+}
+function openPick(){picked=new Set();$("pickQ").value="";renderPick();$("pick").showModal();$("pickQ").focus()}
+$("pickQ").oninput=renderPick;
+$("pickList").onchange=e=>{if(e.target.type==="checkbox")e.target.checked?picked.add(e.target.value):picked.delete(e.target.value)};
+$("pickCancel").onclick=()=>$("pick").close();
+$("pform").onsubmit=()=>{
+  if(!picked.size||!openProj)return;
+  toast(picked.size+" tâche(s) ajoutée(s) au projet",true);
+  tasks.forEach(t=>{if(picked.has(t.id))t.project=openProj});
+  save();render();
+};
 function render(){
   document.body.classList.toggle("pv",view==="projects");
   $("projBtn").textContent=view==="projects"?"📅 Jours":"📁 Projets";
@@ -825,12 +855,11 @@ $("q").oninput=e=>{q=e.target.value;render()};
 $("qf").onclick=e=>{const b=e.target.closest("button");if(b){qf=b.dataset.v;savePrefs();render()}};
 $("pdvSel").onchange=e=>{pdvF=e.target.value;render()};
 $("main").onchange=e=>{
-  if(e.target.dataset.pnotes!==undefined){const p=projects.find(x=>x.name===openProj);if(p){p.notes=e.target.value;save()}return}
   if(e.target.dataset.act!=="st")return;
   setStatus(find(e.target.closest(".task").dataset.id),e.target.value);
 };
 $("main").onclick=e=>{
-  const pb=e.target.closest("[data-p-open],[data-p-back],[data-p-add],[data-p-new],[data-p-rename],[data-p-del]");
+  const pb=e.target.closest("[data-p-open],[data-p-back],[data-p-add],[data-p-new],[data-p-pick],[data-p-rename],[data-p-del]");
   if(pb)return projectAction(pb);
   const c=e.target.closest("[data-carry]");
   if(c){
