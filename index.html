@@ -275,6 +275,23 @@ dialog.ask{width:min(430px,92vw)}
 .askbox p{margin:0;color:var(--mute);white-space:pre-line}
 .askbox .acts{display:flex;justify-content:flex-end;gap:8px;padding-top:6px}
 .toast{border-radius:16px;padding:12px 18px;animation:pop .2s ease-out;font-weight:550}
+/* boutons plus grands (cibles faciles à cliquer) */
+.btn{padding:10px 18px;font-size:15px}
+.btn.primary{padding:11px 20px}
+.btn.sm{padding:8px 15px;font-size:14px;border-radius:12px}
+.pill{font-size:14px;padding:7px 9px 7px 14px}
+.pill .btn.sm{padding:6px 12px}
+.seg button{padding:8px 16px;font-size:14.5px}
+.chip{padding:8px 16px;font-size:14.5px}
+.stat{min-height:64px}
+.icon{font-size:20px;min-width:42px;height:42px;padding:0;border-radius:12px;display:inline-grid;place-items:center}
+.icon.fire,.fire.icon{font-size:22px}
+.right{gap:6px}
+.badge{padding:8px 16px;font-size:14px}
+.chk{width:30px;height:30px;font-size:16px}
+.navb{min-width:48px}
+.menubox button{padding:12px 14px;font-size:15px}
+@media (max-width:700px){.icon{min-width:44px;height:44px}}
 @media (prefers-reduced-motion:reduce){*,::before,::after{animation:none!important;transition:none!important}}
 </style>
 </head>
