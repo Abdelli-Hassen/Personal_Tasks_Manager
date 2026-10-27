@@ -102,6 +102,7 @@ h1{font-size:26px;margin:0;letter-spacing:-.03em}
 .c{display:block;color:var(--mute);font-size:13px;margin-top:1px}
 .pdv{display:inline-block;font-size:11.5px;font-weight:650;padding:2px 8px;border-radius:6px;margin-right:8px;vertical-align:1px;
   background:hsl(var(--h) 80% 50%/.14);color:hsl(var(--h) 60% var(--pl))}
+.per{display:block;color:var(--ok);font-size:12.5px;margin-top:2px;text-decoration:none}
 .wk{font-size:11px;color:var(--wip);background:var(--wip-bg);border-radius:6px;padding:1px 6px;margin-left:6px;cursor:help}
 .right{display:flex;gap:4px;align-items:center}
 .badge{border:0;border-radius:999px;padding:5px 10px;font-size:12.5px;font-weight:600;cursor:pointer;appearance:none;-webkit-appearance:none;text-align:center}
@@ -308,7 +309,7 @@ function cleanPdvs(){
 }
 
 /* ---------- CSV <-> tâches ---------- */
-const HEADER=["Week-date","PDV","Tache","Situation","commentaire","Date","Heure","Urgent"];
+const HEADER=["Week-date","PDV","Tache","Situation","commentaire","Date","Heure","Urgent","Fait le","Heure fin","Depuis"];
 const isUrg=t=>t.urgent&&!isDone(t.status);
 // plus récent d'abord : heure décroissante (sans heure en dernier), puis les dernières ajoutées
 const byNew=(a,b)=>{
@@ -341,12 +342,12 @@ function fromCsv(text){
   const sep=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?";":",";
   const out=[];let label=null,start=null;
   parseCsv(text,sep).forEach((r,i)=>{
-    const [a,pdv,task,st,cm,dcol,tcol,ucol]=r.map(x=>(x||"").trim());
+    const [a,pdv,task,st,cm,dcol,tcol,ucol,fdate,ftime,from]=r.map(x=>(x||"").trim());
     if(i===0&&norm(task)==="tache")return;
     if(a&&!pdv&&!task){label=a;start=labelStart(a);return}
     if(!pdv&&!task)return;
     const d=parseDate(dcol)||parseDate(a);
-    out.push({id:uid(),date:d||start||todayIso,week:!d,weekLabel:d?null:label,pdv,task,status:BYLABEL[norm(st)]||"todo",comment:cm||"",time:parseTime(tcol),urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||"")});
+    out.push({id:uid(),date:d||start||todayIso,week:!d,weekLabel:d?null:label,pdv,task,status:BYLABEL[norm(st)]||"todo",comment:cm||"",time:parseTime(tcol),urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||""),doneDate:isDone(BYLABEL[norm(st)]||"todo")?parseDate(fdate):null,doneTime:parseTime(ftime),from:parseDate(from)});
   });
   return out;
 }
@@ -360,8 +361,8 @@ function toCsv(){
   const key=l=>labelStart(l)||"9999";
   const rows=[HEADER];
   [...groups.entries()].sort((x,y)=>key(x[0]).localeCompare(key(y[0]))).forEach(([label,list])=>{
-    rows.push([label,"","","","","","",""]);
-    [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":""]));
+    rows.push([label,"","","","","","","","","",""]);
+    [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":"",isDone(t.status)&&t.doneDate||"",isDone(t.status)&&t.doneDate&&t.doneTime||"",t.from||""]));
   });
   return "﻿"+rows.map(r=>r.map(cell).join(";")).join("\r\n")+"\r\n";
 }
@@ -512,7 +513,7 @@ const stamp=()=>iso(new Date());
 function flatRows(list){
   return [...list].sort((a,b)=>a.date.localeCompare(b.date)||byTime(a,b)).map(t=>({
     "Semaine":t.week&&t.weekLabel?t.weekLabel:weekLabel(t.date),
-    "Date":t.week?"":t.date,"Heure":t.time||"","Urgent":t.urgent?"Oui":"","PDV":t.pdv,"Tâche":t.task,"Situation":STATUS[t.status].label,"Commentaire":t.comment}));
+    "Date":t.week?"":t.date,"Heure":t.time||"","Urgent":t.urgent?"Oui":"","Fini le":isDone(t.status)&&t.doneDate||"","Heure fin":isDone(t.status)&&t.doneDate&&t.doneTime||"","PDV":t.pdv,"Tâche":t.task,"Situation":STATUS[t.status].label,"Commentaire":t.comment}));
 }
 function loadXlsx(){
   if(window.XLSX)return Promise.resolve();
@@ -526,8 +527,8 @@ function loadXlsx(){
 async function exportXlsx(list,name){
   try{await loadXlsx()}catch(e){return toast(e.message)}
   const rows=flatRows(list);
-  const ws=XLSX.utils.json_to_sheet(rows,{header:["Semaine","Date","Heure","Urgent","PDV","Tâche","Situation","Commentaire"]});
-  ws["!cols"]=[{wch:22},{wch:12},{wch:8},{wch:8},{wch:18},{wch:60},{wch:12},{wch:34}];
+  const ws=XLSX.utils.json_to_sheet(rows,{header:["Semaine","Date","Heure","Urgent","Fini le","Heure fin","PDV","Tâche","Situation","Commentaire"]});
+  ws["!cols"]=[{wch:22},{wch:12},{wch:8},{wch:8},{wch:12},{wch:9},{wch:18},{wch:60},{wch:12},{wch:34}];
   ws["!autofilter"]={ref:ws["!ref"]};
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Tâches");
   XLSX.writeFile(wb,name);
@@ -624,12 +625,21 @@ function renderControls(){
   $("pdvSel").innerHTML=`<option value="">Tous les PDV</option>`+pdvs.map(p=>`<option${p===pdvF?" selected":""}>${esc(p)}</option>`).join("");
   $("pdvs").innerHTML=pdvs.map(p=>`<option value="${esc(p)}">`).join("");
 }
+// période : début (jour de la tâche, ou jour d'origine si reportée) -> fin (jour + heure du clic sur Terminé)
+function period(t){
+  if(!isDone(t.status)||!t.doneDate)return "";
+  const d=s=>fmt(s,{weekday:"short",day:"numeric",month:"short"}),at=t.doneTime?" à "+t.doneTime:"";
+  const a=t.week?null:(t.from||t.date);
+  if(!a||a===t.doneDate)return `Fini le ${d(t.doneDate)}${at}`;
+  const n=Math.round((parse(t.doneDate)-parse(a))/864e5);
+  return `Début ${d(a)}${t.time&&a===t.date?" "+t.time:""} → Fini ${d(t.doneDate)}${at}${n>0?` (${n} j)`:""}`;
+}
 const pdvTag=t=>`<span class="pdv" style="--h:${hue(t.pdv)}">${esc(t.pdv)}</span>`;
 function taskHtml(t){
   const s=STATUS[t.status];
   return `<div class="task st-${t.status}${isDone(t.status)?" done":""}${isUrg(t)?" urgent":""}" data-id="${t.id}">
     <button class="chk" data-act="tick" title="Terminer / rouvrir">✓</button>
-    <div class="t" data-act="edit">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}${esc(t.task)}${t.week?`<span class="wk" title="Seule la semaine est connue. Modifiez la tâche pour fixer le jour.">jour ?</span>`:""}${t.comment?`<span class="c">${esc(t.comment)}</span>`:""}</div>
+    <div class="t" data-act="edit">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}${esc(t.task)}${t.week?`<span class="wk" title="Seule la semaine est connue. Modifiez la tâche pour fixer le jour.">jour ?</span>`:""}${t.comment?`<span class="c">${esc(t.comment)}</span>`:""}${period(t)?`<span class="per">✓ ${period(t)}</span>`:""}</div>
     <div class="right">
       <select class="badge ${s.cls}" data-act="st">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}"${k===t.status?" selected":""}>${v.label}</option>`).join("")}</select>
       <button class="icon fire${t.urgent?" lit":""}" data-act="urg" title="${t.urgent?"Urgent : cliquer pour éteindre":"Pas urgent : cliquer pour allumer"}">🔥</button>
@@ -656,7 +666,7 @@ function renderBoard(items){
   return `<div class="board">`+COLS.map(([k,l])=>{
     const c=items.filter(t=>colOf(t.status)===k);
     return `<div class="col" data-col="${k}"><h4>${l}<span>${c.length}</span></h4>${c.map(t=>
-      `<div class="card${isUrg(t)?" urgent":""}" draggable="true" data-id="${t.id}">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}<div>${esc(t.task)}</div>${t.comment?`<small>${esc(t.comment)}</small>`:""}${scope!=="day"||q.trim()?`<small>${fmt(t.date,{weekday:"short",day:"numeric",month:"short"})}${t.week?" · jour ?":""}</small>`:""}</div>`).join("")}</div>`;
+      `<div class="card${isUrg(t)?" urgent":""}" draggable="true" data-id="${t.id}">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}<div>${esc(t.task)}</div>${t.comment?`<small>${esc(t.comment)}</small>`:""}${period(t)?`<small style="color:var(--ok)">✓ ${period(t)}</small>`:""}${scope!=="day"||q.trim()?`<small>${fmt(t.date,{weekday:"short",day:"numeric",month:"short"})}${t.week?" · jour ?":""}</small>`:""}</div>`).join("")}</div>`;
   }).join("")+`</div>`;
 }
 function render(){
@@ -674,7 +684,13 @@ function toast(msg,undo){
 }
 $("toastBtn").onclick=()=>{if(snap){tasks=JSON.parse(snap);save();render()}$("toast").hidden=true};
 const find=id=>tasks.find(t=>t.id===id);
-function setStatus(t,s){t.status=s;save();render()}
+// l'heure du clic sur « terminé » est mémorisée ; rouvrir la tâche l'efface
+function stampStatus(t,s){
+  if(isDone(s)&&!isDone(t.status)){t.doneDate=todayIso;t.doneTime=new Date().toTimeString().slice(0,5)}
+  else if(!isDone(s)){t.doneDate=null;t.doneTime=""}
+  t.status=s;
+}
+function setStatus(t,s){stampStatus(t,s);save();render()}
 
 const dlg=$("dlg"),f=$("form");
 f.status.innerHTML=Object.entries(STATUS).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join("");
@@ -697,7 +713,11 @@ f.onsubmit=e=>{
   // heure laissée telle quelle = l'heure de l'enregistrement, pas celle de l'ouverture du formulaire
   if(!editId&&!timeTouched)v.time=new Date().toTimeString().slice(0,5);
   v.pdv=v.pdv.replace(/\s+/g," ");v.pdv=canonMap()[pkey(v.pdv)]||v.pdv;
-  if(editId)Object.assign(find(editId),v);else tasks.push({id:uid(),...v});
+  if(editId){
+    const t=find(editId);
+    if(t.date!==v.date)v.from=null;
+    const st=v.status;delete v.status;Object.assign(t,v);stampStatus(t,st);
+  }else{const t={id:uid(),...v,status:"todo"};stampStatus(t,v.status);tasks.push(t)}
   sel=v.date;save();render();
 };
 $("strip").onclick=e=>{
@@ -723,7 +743,7 @@ $("main").onclick=e=>{
   const c=e.target.closest("[data-carry]");
   if(c){
     toast("Tâches reportées à aujourd'hui",true);
-    tasks.forEach(t=>{if(t.date===c.dataset.carry&&!isDone(t.status)){t.date=todayIso;t.week=false;t.weekLabel=null}});
+    tasks.forEach(t=>{if(t.date===c.dataset.carry&&!isDone(t.status)){if(!t.week)t.from??=t.date;t.date=todayIso;t.week=false;t.weekLabel=null}});
     save();render();return;
   }
   const a=e.target.closest("[data-act]");if(!a||a.tagName==="SELECT")return;
