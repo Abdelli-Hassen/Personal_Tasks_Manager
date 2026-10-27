@@ -102,6 +102,19 @@ h1{font-size:26px;margin:0;letter-spacing:-.03em}
 .c{display:block;color:var(--mute);font-size:13px;margin-top:1px}
 .pdv{display:inline-block;font-size:11.5px;font-weight:650;padding:2px 8px;border-radius:6px;margin-right:8px;vertical-align:1px;
   background:hsl(var(--h) 80% 50%/.14);color:hsl(var(--h) 60% var(--pl))}
+.pv .hero,.pv .strip,.pv .toolbar,.pv .chips{display:none!important}
+.prj,.dj{display:inline-block;font-size:11.5px;font-weight:650;padding:2px 8px;border-radius:6px;margin-right:6px;vertical-align:1px;background:var(--conf-bg);color:var(--conf)}
+.dj{background:var(--todo-bg);color:var(--todo)}
+.pnew{display:flex;gap:8px;margin-bottom:16px}.pnew input{flex:1}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.pcard{text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;cursor:pointer;box-shadow:var(--shadow);display:grid;gap:6px}
+.pcard:hover{border-color:var(--accent)}
+.pcard b{font-size:16px}.pcard span,.pcard small{color:var(--mute);font-size:12.5px}
+.pbar{display:block;height:6px;border-radius:3px;background:var(--line);overflow:hidden}.pbar u{display:block;height:100%;background:var(--ok)}
+.phead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}.phead h2{margin:0;font-size:22px;flex:1}
+.pinfo{color:var(--mute);font-size:13px;margin-bottom:12px}
+.pnotes{display:grid;gap:4px;font-size:12.5px;color:var(--mute);margin-bottom:18px}
+.pnotes textarea{width:100%;resize:vertical;font-size:14px}
 .per{display:inline-block;width:100%;color:var(--ok);font-size:12.5px;margin-top:2px}
 .wk{font-size:11px;color:var(--wip);background:var(--wip-bg);border-radius:6px;padding:1px 6px;margin-left:6px;cursor:help}
 .right{display:flex;gap:4px;align-items:center}
@@ -203,6 +216,7 @@ dialog .acts{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
           <button data-ex="csv-all">CSV — tout (format du fichier lié)</button>
           <button data-ex="csv-view">CSV — vue actuelle</button>
         </div></details>
+      <button class="btn" id="projBtn">📁 Projets</button>
       <button class="btn" id="theme" title="Thème">◐</button>
       <button class="btn primary" id="new">+ Nouvelle tâche <kbd style="opacity:.6;font-size:11px">N</kbd></button>
     </div>
@@ -232,8 +246,9 @@ dialog .acts{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
 <dialog id="dlg">
   <form method="dialog" id="form">
     <h2 id="dlgTitle">Nouvelle tâche</h2>
-    <label>Jour<input type="date" name="date" required></label>
+    <label>Jour<input type="date" name="date"></label>
     <label>Heure<input type="time" name="time"></label>
+    <label class="full">Projet<select name="project"></select></label>
     <label>PDV / contexte<input name="pdv" list="pdvs" required placeholder="ex. Total Gr"></label>
     <label>Situation<select name="status"></select></label>
     <label class="full">Tâche<input name="task" required placeholder="Que faut-il faire ?"></label>
@@ -285,6 +300,10 @@ const KEY="suivi-taches-v2";
 let tasks=[];
 try{tasks=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){}
 if(!Array.isArray(tasks))tasks=[];
+let projects=[];
+try{projects=JSON.parse(localStorage.getItem("suivi-projets")||"[]")}catch(e){}
+if(!Array.isArray(projects))projects=[];
+let view="days",openProj=null;
 let sel=todayIso,scope="day",mode="list",statusF="all",pdvF="",q="",qf="pdv",editId=null;
 try{const p=JSON.parse(localStorage.getItem("suivi-prefs")||"{}");scope=p.scope||scope;mode=p.mode||mode;qf=p.qf||qf;if(p.theme)document.documentElement.dataset.theme=p.theme}catch(e){}
 const savePrefs=()=>{try{localStorage.setItem("suivi-prefs",JSON.stringify({scope,mode,qf,theme:document.documentElement.dataset.theme}))}catch(e){}};
@@ -309,7 +328,8 @@ function cleanPdvs(){
 }
 
 /* ---------- CSV <-> tâches ---------- */
-const HEADER=["Week-date","PDV","Tache","Situation","commentaire","Date","Heure","Urgent","Fait le","Heure fin","Depuis"];
+const HEADER=["Week-date","PDV","Tache","Situation","commentaire","Date","Heure","Urgent","Fait le","Heure fin","Depuis","Projet"];
+const NODAY="Sans jour (projets)";
 const isUrg=t=>t.urgent&&!isDone(t.status);
 // plus récent d'abord : heure décroissante (sans heure en dernier), puis les dernières ajoutées
 const byNew=(a,b)=>{
@@ -340,29 +360,33 @@ function fromCsv(text){
   text=text.replace(/^﻿/,"");
   const first=text.split("\n")[0]||"";
   const sep=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?";":",";
-  const out=[];let label=null,start=null;
+  const out=[],projs=[];let label=null,start=null;
   parseCsv(text,sep).forEach((r,i)=>{
-    const [a,pdv,task,st,cm,dcol,tcol,ucol,fdate,ftime,from]=r.map(x=>(x||"").trim());
+    const [a,pdv,task,st,cm,dcol,tcol,ucol,fdate,ftime,from,proj]=r.map(x=>(x||"").trim());
+    if(a==="#PROJET"){projs.push({name:pdv,notes:task});return}
     if(i===0&&norm(task)==="tache")return;
     if(a&&!pdv&&!task){label=a;start=labelStart(a);return}
     if(!pdv&&!task)return;
     const d=parseDate(dcol)||parseDate(a);
-    out.push({id:uid(),date:d||start||todayIso,week:!d,weekLabel:d?null:label,pdv,task,status:BYLABEL[norm(st)]||"todo",comment:cm||"",time:parseTime(tcol),urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||""),doneDate:isDone(BYLABEL[norm(st)]||"todo")?parseDate(fdate):null,doneTime:parseTime(ftime),from:parseDate(from)});
+    const nod=!d&&label===NODAY;
+    out.push({id:uid(),project:proj||"",date:d||(nod?"":start||todayIso),week:!d&&!nod,weekLabel:d||nod?null:label,pdv,task,status:BYLABEL[norm(st)]||"todo",comment:cm||"",time:parseTime(tcol),urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||""),doneDate:isDone(BYLABEL[norm(st)]||"todo")?parseDate(fdate):null,doneTime:parseTime(ftime),from:parseDate(from)});
   });
+  fromCsv.projects=projs;
   return out;
 }
 const cell=s=>/[;"\n\r]/.test(s)?'"'+String(s).replace(/"/g,'""')+'"':s;
 function toCsv(){
   const groups=new Map();
   tasks.forEach(t=>{
-    const label=t.week&&t.weekLabel?t.weekLabel:weekLabel(t.date);
+    const label=!t.date?NODAY:t.week&&t.weekLabel?t.weekLabel:weekLabel(t.date);
     if(!groups.has(label))groups.set(label,[]);groups.get(label).push(t);
   });
   const key=l=>labelStart(l)||"9999";
   const rows=[HEADER];
+  projects.forEach(p=>rows.push(["#PROJET",p.name,p.notes,"","","","","","","","",""]));
   [...groups.entries()].sort((x,y)=>key(x[0]).localeCompare(key(y[0]))).forEach(([label,list])=>{
-    rows.push([label,"","","","","","","","","",""]);
-    [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":"",isDone(t.status)&&t.doneDate||"",isDone(t.status)&&t.doneDate&&t.doneTime||"",t.from||""]));
+    rows.push([label,"","","","","","","","","","",""]);
+    [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":"",isDone(t.status)&&t.doneDate||"",isDone(t.status)&&t.doneDate&&t.doneTime||"",t.from||"",t.project||""]));
   });
   return "﻿"+rows.map(r=>r.map(cell).join(";")).join("\r\n")+"\r\n";
 }
@@ -439,12 +463,12 @@ async function readText(file){
 }
 async function loadFromFile(first,keepSel){
   const f=await handle.getFile();lastMod=f.lastModified;
-  const loaded=fromCsv(await readText(f));
-  if(loaded.length){
+  const loaded=fromCsv(await readText(f)),lp=fromCsv.projects;
+  if(loaded.length||lp.length){
     if(first&&tasks.length&&!confirm(`Charger les ${loaded.length} tâches du fichier ?\n\nOK = utiliser le fichier\nAnnuler = garder les ${tasks.length} tâches de cette page et écraser le fichier`)){
       return writeNow();
     }
-    tasks=loaded;const fixed=cleanPdvs();persistLocal();
+    tasks=loaded;projects=lp;ensureProjects();const fixed=cleanPdvs();persistLocal();
     if(!keepSel){
       const dates=tasks.filter(t=>!t.week).map(t=>t.date);
       sel=dates.includes(todayIso)?todayIso:(dates.sort().pop()||tasks.map(t=>t.date).sort().pop()||todayIso);
@@ -455,7 +479,8 @@ async function loadFromFile(first,keepSel){
   }else if(tasks.length)return writeNow();
   else setFs("ok");
 }
-function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(tasks))}catch(e){}}
+function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(tasks));localStorage.setItem("suivi-projets",JSON.stringify(projects))}catch(e){}}
+function ensureProjects(){tasks.forEach(t=>{if(t.project&&!projects.some(p=>p.name===t.project))projects.push({name:t.project,notes:""})})}
 function save(){
   persistLocal();
   if(!handle)return;
@@ -512,8 +537,8 @@ const viewItems=()=>scoped().filter(matchStatus);
 const stamp=()=>iso(new Date());
 function flatRows(list){
   return [...list].sort((a,b)=>a.date.localeCompare(b.date)||byTime(a,b)).map(t=>({
-    "Semaine":t.week&&t.weekLabel?t.weekLabel:weekLabel(t.date),
-    "Date":t.week?"":t.date,"Heure":t.time||"","Urgent":t.urgent?"Oui":"","Fini le":isDone(t.status)&&t.doneDate||"","Heure fin":isDone(t.status)&&t.doneDate&&t.doneTime||"","PDV":t.pdv,"Tâche":t.task,"Situation":STATUS[t.status].label,"Commentaire":t.comment}));
+    "Semaine":!t.date?"Sans jour":t.week&&t.weekLabel?t.weekLabel:weekLabel(t.date),
+    "Date":t.week?"":t.date,"Heure":t.time||"","Urgent":t.urgent?"Oui":"","Fini le":isDone(t.status)&&t.doneDate||"","Heure fin":isDone(t.status)&&t.doneDate&&t.doneTime||"","Projet":t.project||"","PDV":t.pdv,"Tâche":t.task,"Situation":STATUS[t.status].label,"Commentaire":t.comment}));
 }
 function loadXlsx(){
   if(window.XLSX)return Promise.resolve();
@@ -527,8 +552,8 @@ function loadXlsx(){
 async function exportXlsx(list,name){
   try{await loadXlsx()}catch(e){return toast(e.message)}
   const rows=flatRows(list);
-  const ws=XLSX.utils.json_to_sheet(rows,{header:["Semaine","Date","Heure","Urgent","Fini le","Heure fin","PDV","Tâche","Situation","Commentaire"]});
-  ws["!cols"]=[{wch:22},{wch:12},{wch:8},{wch:8},{wch:12},{wch:9},{wch:18},{wch:60},{wch:12},{wch:34}];
+  const ws=XLSX.utils.json_to_sheet(rows,{header:["Semaine","Date","Heure","Urgent","Fini le","Heure fin","Projet","PDV","Tâche","Situation","Commentaire"]});
+  ws["!cols"]=[{wch:22},{wch:12},{wch:8},{wch:8},{wch:12},{wch:9},{wch:18},{wch:18},{wch:60},{wch:12},{wch:34}];
   ws["!autofilter"]={ref:ws["!ref"]};
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Tâches");
   XLSX.writeFile(wb,name);
@@ -579,14 +604,14 @@ const inScope=t=>{
 };
 let urgF=false;
 // filtre Urgentes : toutes les urgentes encore « À faire » ou « En cours », tous jours confondus
-const isUrgOpen=t=>t.urgent&&(t.status==="todo"||t.status==="wip");
+const isUrgOpen=t=>t.date&&t.urgent&&(t.status==="todo"||t.status==="wip");
 const matchStatus=t=>(statusF==="all"||(statusF==="fin"?isDone(t.status):t.status===statusF));
 // champ visé par la recherche : contexte (PDV), tâche, ou tout (PDV + tâche + commentaire)
 const qText=t=>qf==="pdv"?t.pdv:qf==="task"?t.task:t.pdv+" "+t.task+" "+t.comment;
 const matchQ=t=>!q||norm(qText(t)).includes(norm(q));
 const matchPdv=t=>!pdvF||t.pdv===pdvF;
 // une recherche en cours porte sur toutes les tâches, tous jours confondus
-const scoped=()=>tasks.filter(t=>(q.trim()||(urgF?isUrgOpen(t):inScope(t)))&&matchPdv(t)&&matchQ(t));
+const scoped=()=>tasks.filter(t=>t.date&&(q.trim()||(urgF?isUrgOpen(t):inScope(t)))&&matchPdv(t)&&matchQ(t));
 
 /* ---------- rendu ---------- */
 function renderHero(items){
@@ -624,7 +649,7 @@ function renderControls(){
   $("chips").innerHTML=[["all","Toutes"],["todo","À faire"],["wip","En cours"],["conf","Confirmé"],["fin","Terminé"]]
     .map(([k,l])=>`<span class="chip${statusF===k?" on":""}" data-s="${k}">${l}</span>`).join("")+
     `<span class="chip${urgF?" on":""}" data-u>🔥 Urgentes (${tasks.filter(isUrgOpen).length})</span>`;
-  const pdvs=[...new Set(Object.values(canonMap()))].sort((a,b)=>a.localeCompare(b));
+  const pdvs=[...new Set(Object.values(canonMap()))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
   $("pdvSel").innerHTML=`<option value="">Tous les PDV</option>`+pdvs.map(p=>`<option${p===pdvF?" selected":""}>${esc(p)}</option>`).join("");
   $("pdvs").innerHTML=pdvs.map(p=>`<option value="${esc(p)}">`).join("");
 }
@@ -637,12 +662,13 @@ function period(t){
   const n=Math.round((parse(t.doneDate)-parse(a))/864e5);
   return `Début ${d(a)}${t.time&&a===t.date?" "+t.time:""} → Fini ${d(t.doneDate)}${at}${n>0?` (${n} j)`:""}`;
 }
-const pdvTag=t=>`<span class="pdv" style="--h:${hue(t.pdv)}">${esc(t.pdv)}</span>`;
+const projTag=t=>view==="projects"?`<span class="dj">${t.date?fmt(t.date,{day:"numeric",month:"short"}):"sans jour"}</span>`:(t.project?`<span class="prj">📁 ${esc(t.project)}</span>`:"");
+const pdvTag=t=>!t.pdv?"":`<span class="pdv" style="--h:${hue(t.pdv)}">${esc(t.pdv)}</span>`;
 function taskHtml(t){
   const s=STATUS[t.status];
   return `<div class="task st-${t.status}${isDone(t.status)?" done":""}${isUrg(t)?" urgent":""}" data-id="${t.id}">
     <button class="chk" data-act="tick" title="Terminer / rouvrir">✓</button>
-    <div class="t" data-act="edit">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}${esc(t.task)}${t.week?`<span class="wk" title="Seule la semaine est connue. Modifiez la tâche pour fixer le jour.">jour ?</span>`:""}${t.comment?`<span class="c">${esc(t.comment)}</span>`:""}${period(t)?`<span class="per">✓ ${period(t)}</span>`:""}</div>
+    <div class="t" data-act="edit">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.date&&t.time?`<span class="tm">${t.time}</span>`:""}${projTag(t)}${pdvTag(t)}${esc(t.task)}${t.week?`<span class="wk" title="Seule la semaine est connue. Modifiez la tâche pour fixer le jour.">jour ?</span>`:""}${t.comment?`<span class="c">${esc(t.comment)}</span>`:""}${period(t)?`<span class="per">✓ ${period(t)}</span>`:""}</div>
     <div class="right">
       <select class="badge ${s.cls}" data-act="st">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}"${k===t.status?" selected":""}>${v.label}</option>`).join("")}</select>
       <button class="icon fire${t.urgent?" lit":""}" data-act="urg" title="${t.urgent?"Urgent : cliquer pour éteindre":"Pas urgent : cliquer pour allumer"}">🔥</button>
@@ -672,7 +698,60 @@ function renderBoard(items){
       `<div class="card${isUrg(t)?" urgent":""}" draggable="true" data-id="${t.id}">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${t.time?`<span class="tm">${t.time}</span>`:""}${pdvTag(t)}<div>${esc(t.task)}</div>${t.comment?`<small>${esc(t.comment)}</small>`:""}${period(t)?`<small style="color:var(--ok)">✓ ${period(t)}</small>`:""}${scope!=="day"||q.trim()?`<small>${fmt(t.date,{weekday:"short",day:"numeric",month:"short"})}${t.week?" · jour ?":""}</small>`:""}</div>`).join("")}</div>`;
   }).join("")+`</div>`;
 }
+/* ---------- projets ---------- */
+function projInfo(name){
+  const l=tasks.filter(t=>t.project===name),done=l.filter(t=>isDone(t.status)).length;
+  const a=l.map(t=>t.from||t.date).filter(Boolean).sort()[0]||"",ends=l.map(doneOn).filter(Boolean).sort();
+  const d=s=>fmt(s,{day:"numeric",month:"short"});
+  let per=a?"Début "+d(a):"Aucune tâche";
+  if(a&&l.length===done&&ends.length){const b=ends[ends.length-1],n=Math.round((parse(b)-parse(a))/864e5);per+=" → Fini "+d(b)+(n>0?` (${n} j)`:"")}
+  else if(a)per+=" → en cours";
+  return {l,done,per,pct:l.length?Math.round(done/l.length*100):0};
+}
+function renderProjects(){
+  const P=projects.find(p=>p.name===openProj);
+  if(!P){
+    openProj=null;
+    return `<div class="pnew"><input id="pName" placeholder="Nom du nouveau projet"><button class="btn primary" data-p-add>+ Projet</button></div>`+
+      (projects.length?`<div class="pgrid">`+projects.map(p=>{const i=projInfo(p.name);
+        return `<button class="pcard" data-p-open="${esc(p.name)}"><b>${esc(p.name)}</b><span>${i.done}/${i.l.length} terminées · ${i.pct}%</span><i class="pbar"><u style="width:${i.pct}%"></u></i><small>${i.per}</small></button>`}).join("")+`</div>`
+      :`<div class="empty"><b>Aucun projet</b>Donnez un nom à votre premier projet ci-dessus.</div>`);
+  }
+  const i=projInfo(P.name),list=[...i.l].sort((a,b)=>isDone(a.status)-isDone(b.status)||byPrio(a,b));
+  return `<div class="phead"><button class="btn sm" data-p-back>← Projets</button><h2>📁 ${esc(P.name)}</h2><button class="btn sm" data-p-rename>Renommer</button><button class="btn sm" data-p-del>Supprimer</button></div>
+    <div class="pinfo">${i.done}/${i.l.length} terminées · ${i.pct}% · ${i.per}</div>
+    <label class="pnotes">Notes<textarea data-pnotes rows="4" placeholder="Objectifs, décisions, liens…">${esc(P.notes)}</textarea></label>
+    <h3 class="ghead">Tâches du projet<button class="btn sm primary" data-p-new>+ Tâche</button></h3>`+
+    (list.length?list.map(taskHtml).join(""):`<div class="empty"><b>Aucune tâche</b>Ajoutez la première avec « + Tâche ». Sans jour, elle reste dans le projet seulement.</div>`);
+}
+function addProject(){
+  const n=$("pName").value.trim().replace(/\s+/g," ");if(!n)return;
+  if(projects.some(p=>pkey(p.name)===pkey(n)))return toast("Ce projet existe déjà");
+  projects.push({name:n,notes:""});openProj=n;save();render();
+}
+function projectAction(b){
+  const has=a=>b.hasAttribute(a);
+  if(has("data-p-open")){openProj=b.dataset.pOpen;render();scrollTo(0,0)}
+  else if(has("data-p-back")){openProj=null;render()}
+  else if(has("data-p-add"))addProject();
+  else if(has("data-p-new"))openForm();
+  else if(has("data-p-rename")){
+    const n=(prompt("Nouveau nom du projet",openProj)||"").trim().replace(/\s+/g," ");
+    if(!n||n===openProj)return;
+    if(projects.some(p=>p.name!==openProj&&pkey(p.name)===pkey(n)))return toast("Ce nom existe déjà");
+    projects.find(p=>p.name===openProj).name=n;tasks.forEach(t=>{if(t.project===openProj)t.project=n});
+    openProj=n;save();render();
+  }else if(has("data-p-del")){
+    const n=tasks.filter(t=>t.project===openProj).length;
+    if(!confirm(`Supprimer le projet « ${openProj} » et ses ${n} tâche(s) ?`))return;
+    toast("Projet supprimé",true);
+    const o=openProj;tasks=tasks.filter(t=>t.project!==o);projects=projects.filter(p=>p.name!==o);openProj=null;save();render();
+  }
+}
 function render(){
+  document.body.classList.toggle("pv",view==="projects");
+  $("projBtn").textContent=view==="projects"?"📅 Jours":"📁 Projets";
+  if(view==="projects"){$("main").innerHTML=renderProjects();return}
   const base=scoped();
   renderHero(base);renderStrip();renderControls();
   const items=base.filter(matchStatus).sort(byRecent);
@@ -680,12 +759,12 @@ function render(){
 }
 
 /* ---------- actions ---------- */
-let snap=null,toastT=null;
+let snap=null,snapP=null,toastT=null;
 function toast(msg,undo){
-  $("toastTxt").textContent=msg;$("toastBtn").hidden=!undo;$("toast").hidden=false;snap=undo?JSON.stringify(tasks):null;
+  $("toastTxt").textContent=msg;$("toastBtn").hidden=!undo;$("toast").hidden=false;snap=undo?JSON.stringify(tasks):null;snapP=undo?JSON.stringify(projects):null;
   clearTimeout(toastT);toastT=setTimeout(()=>$("toast").hidden=true,5500);
 }
-$("toastBtn").onclick=()=>{if(snap){tasks=JSON.parse(snap);save();render()}$("toast").hidden=true};
+$("toastBtn").onclick=()=>{if(snap){tasks=JSON.parse(snap);if(snapP)projects=JSON.parse(snapP);save();render()}$("toast").hidden=true};
 const find=id=>tasks.find(t=>t.id===id);
 // l'heure du clic sur « terminé » est mémorisée ; rouvrir la tâche l'efface
 function stampStatus(t,s){
@@ -699,10 +778,16 @@ const dlg=$("dlg"),f=$("form");
 f.status.innerHTML=Object.entries(STATUS).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join("");
 let timeTouched=false;
 f.time.oninput=()=>{timeTouched=true};
+// une tâche de projet peut n'avoir ni jour ni PDV
+const syncReq=()=>{const p=!!f.project.value;f.date.required=!p;f.pdv.required=!p};
+f.project.onchange=syncReq;
 function openForm(t){
   editId=t?t.id:null;
   $("dlgTitle").textContent=t?"Modifier la tâche":"Nouvelle tâche";$("ok").textContent=t?"Enregistrer":"Ajouter";
-  f.date.value=t?t.date:(scope==="all"?todayIso:sel);f.pdv.value=t?t.pdv:pdvF;f.task.value=t?t.task:"";
+  const inP=view==="projects";
+  f.project.innerHTML=`<option value="">Aucun</option>`+projects.map(p=>`<option>${esc(p.name)}</option>`).join("");
+  f.project.value=t?(t.project||""):(inP&&openProj||"");syncReq();
+  f.date.value=t?t.date:(inP?"":(scope==="all"?todayIso:sel));f.pdv.value=t?t.pdv:(inP?"":pdvF);f.task.value=t?t.task:"";
   f.comment.value=t?t.comment:"";f.status.value=t?t.status:"todo";f.urgent.checked=!!(t&&t.urgent);
   f.time.value=t?(t.time||""):new Date().toTimeString().slice(0,5);
   timeTouched=!!t;
@@ -712,16 +797,17 @@ $("new").onclick=()=>openForm();
 $("cancel").onclick=()=>dlg.close();
 f.onsubmit=e=>{
   if(!f.checkValidity())return;
-  const v={date:f.date.value,pdv:f.pdv.value.trim(),task:f.task.value.trim(),comment:f.comment.value.trim(),status:f.status.value,time:f.time.value,urgent:f.urgent.checked,week:false,weekLabel:null};
+  const v={date:f.date.value,pdv:f.pdv.value.trim(),task:f.task.value.trim(),comment:f.comment.value.trim(),status:f.status.value,time:f.time.value,urgent:f.urgent.checked,week:false,weekLabel:null,project:f.project.value};
+  if(!v.date)v.from=(editId&&(find(editId).from||find(editId).date))||todayIso;
   // heure laissée telle quelle = l'heure de l'enregistrement, pas celle de l'ouverture du formulaire
   if(!editId&&!timeTouched)v.time=new Date().toTimeString().slice(0,5);
   v.pdv=v.pdv.replace(/\s+/g," ");v.pdv=canonMap()[pkey(v.pdv)]||v.pdv;
   if(editId){
     const t=find(editId);
-    if(t.date!==v.date)v.from=null;
+    if(v.date&&t.date!==v.date)v.from=null;
     const st=v.status;delete v.status;Object.assign(t,v);stampStatus(t,st);
   }else{const t={id:uid(),...v,status:"todo"};stampStatus(t,v.status);tasks.push(t)}
-  sel=v.date;save();render();
+  if(v.date)sel=v.date;save();render();
 };
 $("strip").onclick=e=>{
   urgF=false;
@@ -739,10 +825,13 @@ $("q").oninput=e=>{q=e.target.value;render()};
 $("qf").onclick=e=>{const b=e.target.closest("button");if(b){qf=b.dataset.v;savePrefs();render()}};
 $("pdvSel").onchange=e=>{pdvF=e.target.value;render()};
 $("main").onchange=e=>{
+  if(e.target.dataset.pnotes!==undefined){const p=projects.find(x=>x.name===openProj);if(p){p.notes=e.target.value;save()}return}
   if(e.target.dataset.act!=="st")return;
   setStatus(find(e.target.closest(".task").dataset.id),e.target.value);
 };
 $("main").onclick=e=>{
+  const pb=e.target.closest("[data-p-open],[data-p-back],[data-p-add],[data-p-new],[data-p-rename],[data-p-del]");
+  if(pb)return projectAction(pb);
   const c=e.target.closest("[data-carry]");
   if(c){
     toast("Tâches reportées à aujourd'hui",true);
@@ -768,6 +857,8 @@ $("main").addEventListener("drop",e=>{
 $("main").addEventListener("dragend",()=>{dragId=null;document.querySelectorAll(".col").forEach(x=>x.classList.remove("over"))});
 $("main").addEventListener("dblclick",e=>{const c=e.target.closest(".card");if(c)openForm(find(c.dataset.id))});
 
+$("projBtn").onclick=()=>{view=view==="projects"?"days":"projects";render()};
+$("main").addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="pName"){e.preventDefault();addProject()}});
 $("theme").onclick=()=>{
   const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme:dark)").matches;
   r.dataset.theme=dark?"light":"dark";savePrefs();
@@ -780,7 +871,7 @@ document.addEventListener("keydown",e=>{
 
 /* ---------- démarrage ---------- */
 $("today").textContent=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-if(cleanPdvs())persistLocal();
+ensureProjects();if(cleanPdvs())persistLocal();
 render();
 (async()=>{
   if(!hasFS)return setFs("nofs");
