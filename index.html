@@ -835,7 +835,7 @@ function renderProjects(){
   return `<div class="phead"><button class="btn sm" data-p-back>← Projets</button><h2>${P.done?"✓":"📁"} ${esc(P.name)}</h2><button class="btn sm${P.done?"":" primary"}" data-p-done>${P.done?"↺ Rouvrir le projet":"✓ Marquer le projet terminé"}</button><button class="btn sm" data-p-rename>Renommer</button><button class="btn sm" data-p-del>Supprimer</button></div>
     <div class="pinfo">${P.done?"Projet terminé":"Projet en cours"} · ${i.done}/${i.l.length} terminées · ${i.pct}% · ${i.per}</div>
     <h3 class="ghead">Tâches du projet<span style="margin-left:auto;display:flex;gap:6px"><button class="btn sm" data-p-pick>+ Tâches existantes</button><button class="btn sm primary" data-p-new>+ Nouvelle tâche</button></span></h3>`+
-    (list.length?list.map(taskHtml).join(""):`<div class="empty"><b>Aucune tâche</b>Ajoutez des tâches déjà faites ou assignées, ou créez-en une nouvelle. Sans jour, une tâche reste dans le projet seulement.</div>`);
+    (list.length?list.map(taskHtml).join(""):`<div class="empty"><b>Aucune tâche</b>Ajoutez des tâches déjà faites ou assignées, ou créez-en une nouvelle. Videz le jour pour qu'une tâche reste dans le projet seulement.</div>`);
 }
 function addProject(){
   const n=$("pName").value.trim().replace(/\s+/g," ");
@@ -933,7 +933,7 @@ function openForm(t){
   const inP=view==="projects";
   f.project.innerHTML=`<option value="">Aucun</option>`+projects.map(p=>`<option>${esc(p.name)}</option>`).join("");
   f.project.value=t?(t.project||""):(inP&&openProj||"");syncReq();
-  f.date.value=t?t.date:(inP?"":(scope==="all"?todayIso:sel));f.pdv.value=t?t.pdv:(inP?"":pdvF);f.task.value=t?t.task:"";
+  f.date.value=t?t.date:(inP||scope==="all"?todayIso:sel);f.pdv.value=t?t.pdv:(inP?"":pdvF);f.task.value=t?t.task:"";
   f.comment.value=t?t.comment:"";f.status.value=t?t.status:"todo";f.urgent.checked=!!(t&&t.urgent);
   f.time.value=t?(t.time||""):new Date().toTimeString().slice(0,5);
   timeTouched=!!t;
