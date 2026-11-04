@@ -38,7 +38,8 @@ h1{font-size:26px;margin:0;letter-spacing:-.03em}
 .pill{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 8px 6px 12px;font-size:13px;color:var(--mute);max-width:480px}
 .pill .dot{width:9px;height:9px;border-radius:50%;background:var(--mute);flex:none}
 .pill.ok .dot{background:var(--ok)}.pill.busy .dot{background:var(--wip)}.pill.err .dot{background:var(--err)}
-.pill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill .btn{flex:none}
+.pill span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* hero */
 .hero{display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:center;background:var(--card);border-radius:20px;padding:20px 24px;box-shadow:var(--shadow);margin-bottom:16px}
@@ -547,7 +548,7 @@ function setFs(state,msg=""){
   const name=handle?handle.name:"";
   const t={none:["Aucun fichier lié","Lier"],
     perm:[name+" — autorisation requise","Reconnecter"],
-    ok:["Enregistré dans "+name+(msg?" · "+msg:"")+(bkOk?" · copie de secours à jour":""),"Changer"],
+    ok:["Enregistré dans "+name+(msg?" · "+msg:"")+(bkOk?" · 💾 ✓":""),"Changer"],
     busy:["Enregistrement…",""],
     err:[msg||"Erreur d'écriture","Réessayer"],
     nofs:["Navigateur non compatible (utilisez Chrome ou Edge)","Exporter CSV"]}[state];
@@ -555,7 +556,7 @@ function setFs(state,msg=""){
   $("pillBtn2").hidden=!handle||state==="busy";
   $("pillBtn3").hidden=!(handle&&(state==="ok"||state==="err"));
   const b4=$("pillBtn4");b4.hidden=!handle||state==="busy"||state==="perm"||bkOk;
-  b4.textContent=bkHandle?"Reconnecter la sauvegarde":"Choisir le dossier de sauvegarde";
+  b4.textContent=bkHandle?"↻ Copie":"+ Copie";b4.title=bkHandle?"Reconnecter le dossier de sauvegarde":"Choisir le dossier de sauvegarde (créez un sous-dossier dans Documents, ex. Suivi-Sauvegarde)";
   renderConnect();
 }
 function renderConnect(){
@@ -639,6 +640,7 @@ function renderPillOnly(){setFs(fsState,fsMsg)}
 async function pickBackup(){
   try{
     if(bkHandle&&await ensurePerm(bkHandle,true)){await mirror();return toast("Sauvegarde mise à jour : "+bkHandle.name+"\\"+BK_NAME)}
+    toast("Chrome refuse « Documents » lui-même : choisissez ou créez un sous-dossier (ex. Suivi-Sauvegarde)");
     const d=await showDirectoryPicker({id:"suivi-backup",mode:"readwrite",startIn:"documents"});
     bkHandle=d;await kvSet("bk",d);await mirror();
     toast(bkOk?"Sauvegarde créée dans « "+d.name+" »":"Sauvegarde impossible dans ce dossier");
