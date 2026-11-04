@@ -35,7 +35,7 @@ header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:s
 h1{font-size:26px;margin:0;letter-spacing:-.03em}
 .sub{color:var(--mute);font-size:13px;text-transform:capitalize}
 .hr{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.pill{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 8px 6px 12px;font-size:13px;color:var(--mute);max-width:480px}
+.pill{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 8px 6px 12px;font-size:13px;color:var(--mute);max-width:560px}
 .pill .dot{width:9px;height:9px;border-radius:50%;background:var(--mute);flex:none}
 .pill.ok .dot{background:var(--ok)}.pill.busy .dot{background:var(--wip)}.pill.err .dot{background:var(--err)}
 .pill .btn{flex:none}
@@ -548,11 +548,11 @@ function setFs(state,msg=""){
   const name=handle?handle.name:"";
   const t={none:["Aucun fichier lié","Lier"],
     perm:[name+" — autorisation requise","Reconnecter"],
-    ok:["Enregistré dans "+name+(msg?" · "+msg:"")+(bkOk?" · 💾 ✓":""),"Changer"],
+    ok:[name+(bkOk?" · 💾":""),"Changer"],
     busy:["Enregistrement…",""],
     err:[msg||"Erreur d'écriture","Réessayer"],
     nofs:["Navigateur non compatible (utilisez Chrome ou Edge)","Exporter CSV"]}[state];
-  $("pillTxt").textContent=t[0];b.textContent=t[1];b.hidden=!t[1];
+  $("pillTxt").textContent=t[0];p.title=state==="ok"?"Enregistré dans "+name+(msg?" · "+msg:"")+(bkOk?" · copie de secours à jour":""):"";b.textContent=t[1];b.hidden=!t[1];
   $("pillBtn2").hidden=!handle||state==="busy";
   $("pillBtn3").hidden=!(handle&&(state==="ok"||state==="err"));
   const b4=$("pillBtn4");b4.hidden=!handle||state==="busy"||state==="perm";
