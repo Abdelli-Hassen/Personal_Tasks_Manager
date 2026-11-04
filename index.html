@@ -312,7 +312,7 @@ a.icon.mail:hover{background:var(--accent-soft);color:var(--accent)}
   <header>
     <div><h1>Suivi des tâches</h1><div class="sub" id="today"></div></div>
     <div class="hr">
-      <div class="pill" id="pill"><i class="dot"></i><span id="pillTxt"></span><button class="btn sm" id="pillBtn"></button><button class="btn sm" id="pillBtn2">Délier</button><button class="btn sm" id="pillBtn3" title="Recharger depuis le fichier">↻</button></div>
+      <div class="pill" id="pill"><i class="dot"></i><span id="pillTxt"></span><button class="btn sm" id="pillBtn"></button><button class="btn sm" id="pillBtn2">Délier</button><button class="btn sm" id="pillBtn3" title="Recharger depuis le fichier">↻</button><button class="btn sm" id="pillBtn4" title="Copie de secours du fichier dans un dossier de votre ordinateur"></button></div>
       <details class="menu" id="expMenu"><summary class="btn">⤓ Exporter</summary>
         <div class="menubox">
           <button data-ex="xlsx-all">Excel (.xlsx) — tout</button>
@@ -538,7 +538,7 @@ const hasFS="showOpenFilePicker" in window;
 const idb=()=>new Promise((res,rej)=>{const r=indexedDB.open("suivi",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const kvGet=async k=>{try{const db=await idb();return await new Promise(res=>{const g=db.transaction("kv").objectStore("kv").get(k);g.onsuccess=()=>res(g.result);g.onerror=()=>res(null)})}catch(e){return null}};
 const kvSet=async(k,v)=>{try{const db=await idb();db.transaction("kv","readwrite").objectStore("kv").put(v,k)}catch(e){}};
-let handle=null,lastMod=0,dirty=false,wTimer=null,busy=Promise.resolve(),fsState="none",fsMsg="";
+let bkHandle=null,bkOk=false,handle=null,lastMod=0,dirty=false,wTimer=null,busy=Promise.resolve(),fsState="none",fsMsg="";
 
 function setFs(state,msg=""){
   fsState=state;fsMsg=msg;
@@ -547,13 +547,15 @@ function setFs(state,msg=""){
   const name=handle?handle.name:"";
   const t={none:["Aucun fichier lié","Lier"],
     perm:[name+" — autorisation requise","Reconnecter"],
-    ok:["Enregistré dans "+name+(msg?" · "+msg:""),"Changer"],
+    ok:["Enregistré dans "+name+(msg?" · "+msg:"")+(bkOk?" · copie de secours à jour":""),"Changer"],
     busy:["Enregistrement…",""],
     err:[msg||"Erreur d'écriture","Réessayer"],
     nofs:["Navigateur non compatible (utilisez Chrome ou Edge)","Exporter CSV"]}[state];
   $("pillTxt").textContent=t[0];b.textContent=t[1];b.hidden=!t[1];
   $("pillBtn2").hidden=!handle||state==="busy";
   $("pillBtn3").hidden=!(handle&&(state==="ok"||state==="err"));
+  const b4=$("pillBtn4");b4.hidden=!handle||state==="busy"||state==="perm"||bkOk;
+  b4.textContent=bkHandle?"Reconnecter la sauvegarde":"Choisir le dossier de sauvegarde";
   renderConnect();
 }
 function renderConnect(){
@@ -615,12 +617,34 @@ async function loadFromFile(first,keepSel){
       const dates=tasks.filter(t=>!t.week).map(t=>t.date);
       sel=dates.includes(todayIso)?todayIso:(dates.sort().pop()||tasks.map(t=>t.date).sort().pop()||todayIso);
     }
-    render();setFs("ok","chargé");
+    render();setFs("ok","chargé");mirror();
     if(!keepSel)toast(tasks.length+" tâches chargées depuis "+handle.name);
     if(fixed){save();toast(fixed+" nom(s) de PDV harmonisé(s) (ex. lac / LAC)")}
   }else if(tasks.length)return writeNow();
   else setFs("ok");
 }
+const BK_NAME="Taches-sauvegarde.csv";
+// Copie de secours : crée Taches-sauvegarde.csv dans le dossier choisi s'il n'existe pas, sinon l'écrase avec le contenu à jour.
+async function mirror(){
+  if(!bkHandle||!handle)return;
+  try{
+    if(!await ensurePerm(bkHandle,false)){bkOk=false;return renderPillOnly()}
+    const fh=await bkHandle.getFileHandle(BK_NAME,{create:true});
+    const w=await fh.createWritable();await w.write(toCsv());await w.close();
+    bkOk=true;
+  }catch(e){bkOk=false}
+  renderPillOnly();
+}
+function renderPillOnly(){setFs(fsState,fsMsg)}
+async function pickBackup(){
+  try{
+    if(bkHandle&&await ensurePerm(bkHandle,true)){await mirror();return toast("Sauvegarde mise à jour : "+bkHandle.name+"\\"+BK_NAME)}
+    const d=await showDirectoryPicker({id:"suivi-backup",mode:"readwrite",startIn:"documents"});
+    bkHandle=d;await kvSet("bk",d);await mirror();
+    toast(bkOk?"Sauvegarde créée dans « "+d.name+" »":"Sauvegarde impossible dans ce dossier");
+  }catch(e){if(e.name!=="AbortError")toast("Sauvegarde : "+e.message)}
+}
+$("pillBtn4").onclick=pickBackup;
 function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(tasks));localStorage.setItem("suivi-projets",JSON.stringify(projects))}catch(e){}}
 function ensureProjects(){tasks.forEach(t=>{if(t.project&&!projects.some(p=>p.name===t.project))projects.push({name:t.project})})}
 function save(){
@@ -636,6 +660,7 @@ function writeNow(){
       const w=await handle.createWritable();
       await w.write(toCsv());await w.close();
       lastMod=(await handle.getFile()).lastModified;dirty=false;
+      await mirror();
       setFs("ok","à "+new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}));
     }catch(e){
       setFs("err",e.name==="NoModificationAllowedError"||/lock|busy|used/i.test(e.message)
@@ -1084,7 +1109,7 @@ ensureProjects();if(cleanPdvs())persistLocal();
 render();
 (async()=>{
   if(!hasFS)return setFs("nofs");
-  handle=await kvGet("h");
+  handle=await kvGet("h");bkHandle=await kvGet("bk");
   if(!handle)return setFs("none");
   try{
     if(await ensurePerm(handle,false))await loadFromFile(false);else setFs("perm");
