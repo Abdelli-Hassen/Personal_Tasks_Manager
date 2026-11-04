@@ -555,8 +555,8 @@ function setFs(state,msg=""){
   $("pillTxt").textContent=t[0];b.textContent=t[1];b.hidden=!t[1];
   $("pillBtn2").hidden=!handle||state==="busy";
   $("pillBtn3").hidden=!(handle&&(state==="ok"||state==="err"));
-  const b4=$("pillBtn4");b4.hidden=!handle||state==="busy"||state==="perm"||bkOk;
-  b4.textContent=bkHandle?"↻ Copie":"+ Copie";b4.title=bkHandle?"Reconnecter le dossier de sauvegarde":"Choisir le dossier de sauvegarde (créez un sous-dossier dans Documents, ex. Suivi-Sauvegarde)";
+  const b4=$("pillBtn4");b4.hidden=!handle||state==="busy"||state==="perm";
+  b4.textContent=bkOk?"💾 Dossier":bkHandle?"↻ Copie":"+ Copie";b4.title=bkOk?"Changer le dossier de la copie de secours ("+bkHandle.name+")":bkHandle?"Reconnecter le dossier de sauvegarde":"Choisir le dossier de sauvegarde (créez un sous-dossier dans Documents, ex. Suivi-Sauvegarde)";
   renderConnect();
 }
 function renderConnect(){
@@ -639,7 +639,7 @@ async function mirror(){
 function renderPillOnly(){setFs(fsState,fsMsg)}
 async function pickBackup(){
   try{
-    if(bkHandle&&await ensurePerm(bkHandle,true)){await mirror();return toast("Sauvegarde mise à jour : "+bkHandle.name+"\\"+BK_NAME)}
+    if(bkHandle&&!bkOk&&await ensurePerm(bkHandle,true)){await mirror();return toast("Sauvegarde mise à jour : "+bkHandle.name+"\\"+BK_NAME)}
     toast("Chrome refuse « Documents » lui-même : choisissez ou créez un sous-dossier (ex. Suivi-Sauvegarde)");
     const d=await showDirectoryPicker({id:"suivi-backup",mode:"readwrite",startIn:"documents"});
     bkHandle=d;await kvSet("bk",d);await mirror();
