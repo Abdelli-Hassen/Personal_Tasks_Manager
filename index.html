@@ -37,6 +37,7 @@ h1{font-size:26px;margin:0;letter-spacing:-.03em}
 .hr{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .pill{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 8px 6px 12px;font-size:13px;color:var(--mute);max-width:560px}
 .pill .dot{width:9px;height:9px;border-radius:50%;background:var(--mute);flex:none}
+.bdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:var(--err)}.bdot.ok{background:var(--ok)}.bdot.wait{background:var(--wip)}
 .pill.ok .dot{background:var(--ok)}.pill.busy .dot{background:var(--wip)}.pill.err .dot{background:var(--err)}
 .pill .btn{flex:none}
 .pill span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -547,7 +548,7 @@ const hasFS="showOpenFilePicker" in window;
 const idb=()=>new Promise((res,rej)=>{const r=indexedDB.open("suivi",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const kvGet=async k=>{try{const db=await idb();return await new Promise(res=>{const g=db.transaction("kv").objectStore("kv").get(k);g.onsuccess=()=>res(g.result);g.onerror=()=>res(null)})}catch(e){return null}};
 const kvSet=async(k,v)=>{try{const db=await idb();db.transaction("kv","readwrite").objectStore("kv").put(v,k)}catch(e){}};
-let bkHandle=null,bkOk=false,handle=null,lastMod=0,dirty=false,wTimer=null,busy=Promise.resolve(),fsState="none",fsMsg="";
+let bkHandle=null,bkOk=false,bkErr=false,bkBusy=false,handle=null,lastMod=0,dirty=false,wTimer=null,busy=Promise.resolve(),fsState="none",fsMsg="";
 
 function setFs(state,msg=""){
   fsState=state;fsMsg=msg;
@@ -556,7 +557,7 @@ function setFs(state,msg=""){
   const name=handle?handle.name:"";
   const t={none:["Aucun fichier lié","Lier"],
     perm:[name+" — autorisation requise","Reconnecter"],
-    ok:[name+(bkOk?" · 💾":""),"Changer"],
+    ok:[name,"Changer"],
     busy:["Enregistrement…",""],
     err:[msg||"Erreur d'écriture","Réessayer"],
     nofs:["Navigateur non compatible (utilisez Chrome ou Edge)","Exporter CSV"]}[state];
@@ -564,7 +565,7 @@ function setFs(state,msg=""){
   $("pillBtn2").hidden=!handle||state==="busy";
   $("pillBtn3").hidden=!(handle&&(state==="ok"||state==="err"));
   const b4=$("pillBtn4");b4.hidden=!handle||state==="busy"||state==="perm";
-  b4.textContent=bkOk?"💾 Dossier":bkHandle?"↻ Copie":"+ Copie";b4.title=bkOk?"Changer le dossier de la copie de secours ("+bkHandle.name+")":bkHandle?"Reconnecter le dossier de sauvegarde":"Choisir le dossier de sauvegarde (créez un sous-dossier dans Documents, ex. Suivi-Sauvegarde)";
+  const bs=bkOk?"ok":(!bkHandle||bkErr)?"err":"wait";b4.innerHTML='<span class="bdot '+bs+'"></span>'+(bkHandle?"Dossier":"+ Copie");b4.title=bkOk?"Changer le dossier de la copie de secours ("+bkHandle.name+")":bkHandle?"Reconnecter le dossier de sauvegarde":"Choisir le dossier de sauvegarde (créez un sous-dossier dans Documents, ex. Suivi-Sauvegarde)";
   renderConnect();
 }
 function renderConnect(){
@@ -637,11 +638,12 @@ const BK_NAME="Taches-sauvegarde.csv";
 async function mirror(){
   if(!bkHandle||!handle)return;
   try{
+    bkErr=false;
     if(!await ensurePerm(bkHandle,false)){bkOk=false;return renderPillOnly()}
     const fh=await bkHandle.getFileHandle(BK_NAME,{create:true});
     const w=await fh.createWritable();await w.write(toCsv());await w.close();
     bkOk=true;
-  }catch(e){bkOk=false}
+  }catch(e){bkOk=false;bkErr=true}
   renderPillOnly();
 }
 function renderPillOnly(){setFs(fsState,fsMsg)}
