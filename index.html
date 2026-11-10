@@ -366,6 +366,7 @@ a.icon.mail:hover{background:var(--accent-soft);color:var(--accent)}
     <label class="full">Tâche<input name="task" required placeholder="Que faut-il faire ?"></label>
     <label class="full">Commentaire<input name="comment" placeholder="optionnel"></label>
     <label class="full">Lien (e-mail ou fichier)<input name="link" type="url" pattern="https?://\S+" placeholder="Collez le lien d'un e-mail ou d'un fichier  optionnel" title="Un lien commençant par http:// ou https://"></label>
+    <div class="full" id="linkWarn" hidden style="font-size:12px;color:var(--warn,#b45309);margin-top:-6px"></div>
     <datalist id="pdvs"></datalist>
     <label class="full urgl impl"><input type="checkbox" name="important"><span class="fire">⭐</span><span class="ut on-t">Importante : mise en avant</span><span class="ut off-t">Pas importante (cliquer pour marquer)</span></label>
     <label class="full urgl"><input type="checkbox" name="urgent"><span class="fire">🔥</span><span class="ut on-t">Urgente : allumée, en haut de la liste</span><span class="ut off-t">Pas urgente : éteinte (cliquer pour allumer)</span></label>
@@ -406,6 +407,22 @@ const BYLABEL=Object.fromEntries(Object.entries(STATUS).map(([k,v])=>[norm(v.lab
 const DAYS=["dim","lun","mar","mer","jeu","ven","sam"];
 const pad=n=>String(n).padStart(2,"0");
 const linkIcon=u=>/outlook|office\.com|gmail|mail\./i.test(u)&&!/sharepoint|\.xlsx|\.docx/i.test(u)?"✉":"🔗";
+const mailKind=u=>linkIcon(u)!=="✉"?"":/gmail|mail\.google/i.test(u)?"g":"o";
+// secours si le lien d'un e-mail ne s'ouvre plus : recherche par le commentaire (sinon la tâche)
+function mailSearch(t){
+  const q=(t.comment||t.task||"").trim();let u;
+  try{u=new URL(t.link)}catch(e){return}
+  if(mailKind(t.link)==="g"){
+    const m=u.pathname.match(/\/mail\/u\/(\d+)/)||u.hash.match(/^#?\/?u\/(\d+)/);
+    window.open("https://mail.google.com/mail/u/"+(m?m[1]:0)+"/#search/"+encodeURIComponent(q),"_blank","noopener");
+  }else{
+    // Outlook n'a pas d'adresse de recherche officielle : on copie la recherche et on ouvre la boîte
+    try{navigator.clipboard.writeText(q)}catch(e){}
+    window.open(u.origin+"/mail/","_blank","noopener");
+    toast("Recherche copiée : collez-la (Ctrl+V) dans la barre de recherche d'Outlook");
+  }
+}
+const FRAGILE=/ItemID=|\/id\/[A-Za-z0-9%_-]{20,}/i;
 const safeUrl=u=>/^https?:\/\/\S+$/i.test(u||"")?u:"";
 const iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
 const parse=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
@@ -856,6 +873,7 @@ function taskHtml(t){
     <div class="right">
       <select class="badge ${s.cls}" data-act="st">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}"${k===t.status?" selected":""}>${v.label}</option>`).join("")}</select>
       ${safeUrl(t.link)?`<a class="icon mail" href="${esc(t.link)}" target="_blank" rel="noopener noreferrer" title="Ouvrir le lien">${linkIcon(t.link)}</a>`:""}
+      ${safeUrl(t.link)&&mailKind(t.link)?`<button class="icon" data-act="msearch" title="Le lien ne s'ouvre plus ? Chercher cet e-mail (par le commentaire, sinon la tâche)">🔎</button>`:""}
       <button class="icon star${t.important?" lit":""}" data-act="imp" title="${t.important?"Important : cliquer pour retirer":"Pas important : cliquer pour marquer"}">⭐</button>
       <button class="icon fire${t.urgent?" lit":""}" data-act="urg" title="${t.urgent?"Urgent : cliquer pour éteindre":"Pas urgent : cliquer pour allumer"}">🔥</button>
       <button class="icon" data-act="edit" title="Modifier">✎</button>
@@ -1010,6 +1028,13 @@ f.time.oninput=()=>{timeTouched=true};
 // une tâche de projet peut n'avoir ni jour ni PDV
 const syncReq=()=>{const p=!!f.project.value;f.date.required=!p;f.pdv.required=!p};
 f.project.onchange=syncReq;
+function checkLink(){
+  const v=f.link.value.trim(),w=$("linkWarn");let m="";
+  if(v&&mailKind(v)==="o"&&FRAGILE.test(v))m="⚠ Lien Outlook propre à un message : il cessera de s'ouvrir si l'e-mail est déplacé ou archivé. Mettez le sujet en commentaire : le bouton 🔎 retrouvera le message.";
+  else if(v&&mailKind(v)==="g"&&/#(?:inbox|all|label|sent)\//i.test(v))m="⚠ Lien Gmail : il ne s'ouvre que dans le même compte Google. Mettez le sujet en commentaire : le bouton 🔎 retrouvera le message.";
+  w.textContent=m;w.hidden=!m;
+}
+f.link.addEventListener("input",checkLink);
 function openForm(t){
   editId=t?t.id:null;
   $("dlgTitle").textContent=t?"Modifier la tâche":"Nouvelle tâche";$("ok").textContent=t?"Enregistrer":"Ajouter";
@@ -1019,7 +1044,7 @@ function openForm(t){
   f.date.value=t?t.date:(inP||scope==="all"?todayIso:sel);f.pdv.value=t?t.pdv:(inP?"":pdvF);f.task.value=t?t.task:"";
   f.comment.value=t?t.comment:"";f.link.value=t?(t.link||""):"";f.status.value=t?t.status:"todo";f.urgent.checked=!!(t&&t.urgent);f.important.checked=!!(t&&t.important);
   f.time.value=t?(t.time||""):new Date().toTimeString().slice(0,5);
-  timeTouched=!!t;
+  timeTouched=!!t;checkLink();
   dlg.showModal();(t?f.task:f.pdv).focus();
 }
 $("new").onclick=()=>openForm();
@@ -1076,6 +1101,7 @@ $("main").onclick=e=>{
   const a=e.target.closest("[data-act]");if(!a||a.tagName==="SELECT")return;
   const t=find(a.closest(".task").dataset.id);
   if(a.dataset.act==="edit")openForm(t);
+  if(a.dataset.act==="msearch")mailSearch(t);
   if(a.dataset.act==="urg"){t.urgent=!t.urgent;save();render()}
   if(a.dataset.act==="imp"){t.important=!t.important;save();render()}
   if(a.dataset.act==="tick")setStatus(t,isDone(t.status)?"todo":"ok");
