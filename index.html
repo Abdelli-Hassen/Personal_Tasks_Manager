@@ -313,23 +313,19 @@ a.icon.mail:hover{background:var(--accent-soft);color:var(--accent)}
 .menubox button{padding:12px 14px;font-size:15px}
 @media (max-width:700px){.icon{min-width:44px;height:44px}}
 @media (prefers-reduced-motion:reduce){*,::before,::after{animation:none!important;transition:none!important}}
-/* en-tête sur une seule ligne (écrans larges) */
-@media (min-width:900px){
-  header{flex-wrap:nowrap}header>div:first-child{flex:none}
-  .hr{flex-wrap:nowrap;min-width:0;gap:6px}.hr>.btn,.hr>.menu{flex:none}
-  .hr .btn,.hr summary.btn{padding-left:12px;padding-right:12px;white-space:nowrap}
-  .pill{min-width:0;flex:0 1 auto}
-  #new{padding:6px 14px;font-size:22px;line-height:1;min-width:46px}
-}
+/* en-tête : le titre sur sa ligne, les boutons sur la ligne du dessous */
+header>div:first-child{flex:0 0 100%}
+.hr{flex:0 0 100%;margin-left:0;justify-content:flex-start;flex-wrap:wrap}
+#new{padding:6px 14px;font-size:22px;line-height:1;min-width:46px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div><h1>Suivi des tâches</h1><div class="sub" id="today"></div></div>
+    <div><h1>Suivi des tâches</h1></div>
     <div class="hr">
       <div class="pill" id="pill"><i class="dot"></i><span id="pillTxt"></span><button class="btn sm" id="pillBtn"></button><button class="btn sm" id="pillBtn2">Délier</button><button class="btn sm" id="pillBtn3" title="Recharger depuis le fichier">↻</button><button class="btn sm" id="pillBtn4" title="Copie de secours du fichier dans un dossier de votre ordinateur"></button></div>
-      <details class="menu" id="expMenu"><summary class="btn">⤓ Exporter</summary>
+      <details class="menu" id="expMenu"><summary class="btn" title="Exporter" aria-label="Exporter">⤓</summary>
         <div class="menubox">
           <button data-ex="xlsx-all">Excel (.xlsx) — tout</button>
           <button data-ex="xlsx-view">Excel (.xlsx) — vue actuelle</button>
@@ -1179,7 +1175,6 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ---------- démarrage ---------- */
-$("today").textContent=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
 ensureProjects();if(cleanPdvs())persistLocal();
 render();
 (async()=>{
