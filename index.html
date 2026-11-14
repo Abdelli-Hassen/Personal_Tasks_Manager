@@ -315,8 +315,12 @@ a.icon.mail:hover{background:var(--accent-soft);color:var(--accent)}
 @media (prefers-reduced-motion:reduce){*,::before,::after{animation:none!important;transition:none!important}}
 /* en-tête : le titre sur sa ligne, les boutons sur la ligne du dessous */
 header>div:first-child{flex:0 0 100%}
-.hr{flex:0 0 100%;margin-left:0;justify-content:flex-start;flex-wrap:wrap}
-#new{padding:6px 14px;font-size:22px;line-height:1;min-width:46px}
+.hr{flex:0 0 100%;margin-left:0;justify-content:flex-end;flex-wrap:wrap;align-items:center}
+/* tous les éléments de la barre ont la même hauteur */
+.hr>.btn,.hr>.menu>summary,.hr>.pill{height:46px;box-sizing:border-box;margin:0;display:inline-flex;align-items:center;justify-content:center}
+.hr>.pill{justify-content:flex-start;padding-top:0;padding-bottom:0}
+.hr>.menu{display:inline-flex}
+#new{padding:0 16px;font-size:22px;line-height:1;min-width:48px}
 </style>
 </head>
 <body>
