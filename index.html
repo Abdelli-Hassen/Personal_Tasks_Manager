@@ -313,6 +313,14 @@ a.icon.mail:hover{background:var(--accent-soft);color:var(--accent)}
 .menubox button{padding:12px 14px;font-size:15px}
 @media (max-width:700px){.icon{min-width:44px;height:44px}}
 @media (prefers-reduced-motion:reduce){*,::before,::after{animation:none!important;transition:none!important}}
+/* en-tête sur une seule ligne (écrans larges) */
+@media (min-width:900px){
+  header{flex-wrap:nowrap}header>div:first-child{flex:none}
+  .hr{flex-wrap:nowrap;min-width:0;gap:6px}.hr>.btn,.hr>.menu{flex:none}
+  .hr .btn,.hr summary.btn{padding-left:12px;padding-right:12px;white-space:nowrap}
+  .pill{min-width:0;flex:0 1 auto}
+  #new{padding:6px 14px;font-size:22px;line-height:1;min-width:46px}
+}
 </style>
 </head>
 <body>
@@ -331,7 +339,7 @@ a.icon.mail:hover{background:var(--accent-soft);color:var(--accent)}
       <button class="btn" id="impBtn" title="Tâches importantes et projets">⭐ Importance</button>
       <button class="btn" id="projBtn">📁 Projets</button>
       <button class="btn" id="theme" title="Thème">◐</button>
-      <button class="btn primary" id="new">+ Nouvelle tâche <kbd style="opacity:.6;font-size:11px">N</kbd></button>
+      <button class="btn primary" id="new" title="Nouvelle tâche (N)" aria-label="Nouvelle tâche">＋</button>
     </div>
   </header>
 
