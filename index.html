@@ -328,6 +328,7 @@ a.icon.mail:hover{background:var(--accent-soft);color:var(--accent)}
           <button data-ex="csv-all">CSV — tout (format du fichier lié)</button>
           <button data-ex="csv-view">CSV — vue actuelle</button>
         </div></details>
+      <button class="btn" id="impBtn" title="Tâches importantes et projets">⭐ Importance</button>
       <button class="btn" id="projBtn">📁 Projets</button>
       <button class="btn" id="theme" title="Thème">◐</button>
       <button class="btn primary" id="new">+ Nouvelle tâche <kbd style="opacity:.6;font-size:11px">N</kbd></button>
@@ -471,7 +472,9 @@ if(!Array.isArray(tasks))tasks=[];
 let projects=[];
 try{projects=JSON.parse(localStorage.getItem("suivi-projets")||"[]")}catch(e){}
 if(!Array.isArray(projects))projects=[];
-let view="days",openProj=null;
+let view="days",openProj=null,impF="none";
+// vrai quand on regarde le détail d'un projet (page Projets, ou page Importance avec un projet ouvert)
+const inProj=()=>view==="projects"||(view==="importance"&&!!openProj);
 let sel=todayIso,scope="day",mode="list",statusF=new Set(),pdvF="",q="",qf="pdv",editId=null;
 try{const p=JSON.parse(localStorage.getItem("suivi-prefs")||"{}");scope=p.scope||scope;mode=p.mode||mode;qf=p.qf||qf;if(p.theme)document.documentElement.dataset.theme=p.theme}catch(e){}
 const savePrefs=()=>{try{localStorage.setItem("suivi-prefs",JSON.stringify({scope,mode,qf,theme:document.documentElement.dataset.theme}))}catch(e){}};
@@ -863,7 +866,7 @@ function period(t){
   const n=Math.round((parse(t.doneDate)-parse(a))/864e5);
   return `Début ${d(a)}${t.time&&a===t.date?" "+t.time:""} → Fini ${d(t.doneDate)}${at}${n>0?` (${n} j)`:""}`;
 }
-const projTag=t=>view==="projects"?`<span class="dj">${t.date?fmt(t.date,{day:"numeric",month:"short"}):"sans jour"}</span>`:(t.project?`<span class="prj">📁 ${esc(t.project)}</span>`:"");
+const projTag=t=>inProj()?`<span class="dj">${t.date?fmt(t.date,{day:"numeric",month:"short"}):"sans jour"}</span>`:(t.project?`<span class="prj">📁 ${esc(t.project)}</span>`:"");
 const pdvTag=t=>!t.pdv?"":`<span class="pdv" style="--h:${hue(t.pdv)}">${esc(t.pdv)}</span>`;
 function taskHtml(t){
   const s=STATUS[t.status];
@@ -877,8 +880,8 @@ function taskHtml(t){
       <button class="icon star${t.important?" lit":""}" data-act="imp" title="${t.important?"Important : cliquer pour retirer":"Pas important : cliquer pour marquer"}">⭐</button>
       <button class="icon fire${t.urgent?" lit":""}" data-act="urg" title="${t.urgent?"Urgent : cliquer pour éteindre":"Pas urgent : cliquer pour allumer"}">🔥</button>
       <button class="icon" data-act="edit" title="Modifier">✎</button>
-      ${view==="projects"?`<button class="icon" data-act="unproj" title="Retirer du projet (la tâche est conservée)">⊖</button>`:""}
-      <button class="icon" data-act="del" title="${view==="projects"?"Supprimer définitivement la tâche":"Supprimer"}">✕</button>
+      ${inProj()?`<button class="icon" data-act="unproj" title="Retirer du projet (la tâche est conservée)">⊖</button>`:""}
+      <button class="icon" data-act="del" title="${inProj()?"Supprimer définitivement la tâche":"Supprimer"}">✕</button>
     </div></div>`;
 }
 function renderList(items){
@@ -989,9 +992,30 @@ $("pform").onsubmit=()=>{
   tasks.forEach(t=>{if(picked.has(t.id))t.project=openProj});
   save();render();
 };
+// page Importance : projets (créer / ouvrir / renommer / supprimer) + liste des tâches importantes
+function renderImportance(){
+  if(openProj)return renderProjects();
+  const all=tasks.filter(t=>t.important);
+  const l=all.filter(t=>impF==="all"||(impF==="in"?!!t.project:!t.project))
+    .sort((a,b)=>isDone(a.status)-isDone(b.status)||byPrio(a,b));
+  const F=[["none","Hors projet"],["in","Dans un projet"],["all","Toutes"]];
+  const n=l.filter(t=>!isDone(t.status)).length;
+  return `<h3 class="ghead">📁 Projets<span>${projects.length}</span></h3>`+renderProjects()+
+    `<h3 class="ghead" style="margin-top:22px">⭐ Tâches importantes<span>${n} à faire · ${l.length} affichée(s) sur ${all.length}</span>
+      <span class="seg" style="margin-left:auto">${F.map(([k,t])=>`<button data-imp-f="${k}"${k===impF?' class="on"':""}>${t}</button>`).join("")}</span>
+      <button class="btn sm primary" data-p-new style="margin-left:0">+ Nouvelle tâche</button></h3>`+
+    (l.length?l.map(taskHtml).join(""):`<div class="empty"><b>Aucune tâche importante ici</b>${all.length?"Changez le filtre ci-dessus.":"Cliquez sur l'étoile ⭐ d'une tâche pour qu'elle apparaisse ici."}</div>`);
+}
 function render(){
-  document.body.classList.toggle("pv",view==="projects");
-  const nu=projects.filter(pUrg).length;
+  document.body.classList.toggle("pv",view!=="days");
+  const nu=projects.filter(pUrg).length,ni=tasks.filter(isImp).length;
+  $("impBtn").textContent=view==="importance"?"📅 Jours":"⭐ Importance"+(ni?` · ${ni}`:"");
+  if(view==="importance"){
+    const keep=$("pName")?$("pName").value:"";
+    $("main").innerHTML=renderImportance();
+    if(keep&&$("pName"))$("pName").value=keep;
+    return;
+  }
   $("projBtn").textContent=view==="projects"?"📅 Jours":"📁 Projets"+(nu?` · 🔥${nu}`:"");
   if(view==="projects"){
     const keep=$("pName")?$("pName").value:"";
@@ -1038,11 +1062,11 @@ f.link.addEventListener("input",checkLink);
 function openForm(t){
   editId=t?t.id:null;
   $("dlgTitle").textContent=t?"Modifier la tâche":"Nouvelle tâche";$("ok").textContent=t?"Enregistrer":"Ajouter";
-  const inP=view==="projects";
+  const inP=inProj();
   f.project.innerHTML=`<option value="">Aucun</option>`+projects.map(p=>`<option>${esc(p.name)}</option>`).join("");
   f.project.value=t?(t.project||""):(inP&&openProj||"");syncReq();
   f.date.value=t?t.date:(inP||scope==="all"?todayIso:sel);f.pdv.value=t?t.pdv:(inP?"":pdvF);f.task.value=t?t.task:"";
-  f.comment.value=t?t.comment:"";f.link.value=t?(t.link||""):"";f.status.value=t?t.status:"todo";f.urgent.checked=!!(t&&t.urgent);f.important.checked=!!(t&&t.important);
+  f.comment.value=t?t.comment:"";f.link.value=t?(t.link||""):"";f.status.value=t?t.status:"todo";f.urgent.checked=!!(t&&t.urgent);f.important.checked=t?!!t.important:(view==="importance"&&!openProj);
   f.time.value=t?(t.time||""):new Date().toTimeString().slice(0,5);
   timeTouched=!!t;checkLink();
   dlg.showModal();(t?f.task:f.pdv).focus();
@@ -1090,6 +1114,8 @@ $("main").onchange=e=>{
   setStatus(find(e.target.closest(".task").dataset.id),e.target.value);
 };
 $("main").onclick=e=>{
+  const fb=e.target.closest("[data-imp-f]");
+  if(fb){impF=fb.dataset.impF;render();return}
   const pb=e.target.closest("[data-p-open],[data-p-back],[data-p-add],[data-p-new],[data-p-pick],[data-p-done],[data-p-urg],[data-p-rename],[data-p-del]");
   if(pb)return projectAction(pb);
   const c=e.target.closest("[data-carry]");
@@ -1112,7 +1138,7 @@ $("main").onclick=e=>{
   }
   if(a.dataset.act==="del"){
     const kill=()=>{toast("Tâche supprimée",true);tasks=tasks.filter(x=>x!==t);save();render()};
-    if(view==="projects")ask({title:"Supprimer cette tâche ?",msg:`« ${t.task} » sera supprimée définitivement. Pour la garder, utilisez « Retirer du projet » (⊖).`,ok:"Supprimer",danger:true}).then(y=>{if(y)kill()});
+    if(inProj())ask({title:"Supprimer cette tâche ?",msg:`« ${t.task} » sera supprimée définitivement. Pour la garder, utilisez « Retirer du projet » (⊖).`,ok:"Supprimer",danger:true}).then(y=>{if(y)kill()});
     else kill();
   }
 };
@@ -1129,6 +1155,7 @@ $("main").addEventListener("dragend",()=>{dragId=null;document.querySelectorAll(
 $("main").addEventListener("dblclick",e=>{const c=e.target.closest(".card");if(c)openForm(find(c.dataset.id))});
 
 $("projBtn").onclick=()=>{view=view==="projects"?"days":"projects";render();if($("pName"))$("pName").focus()};
+$("impBtn").onclick=()=>{view=view==="importance"?"days":"importance";openProj=null;render();scrollTo(0,0)};
 $("main").addEventListener("keydown",e=>{
   if(e.key==="Enter"&&e.target.id==="pName"){e.preventDefault();addProject()}
   if(e.key==="Enter"&&e.target.classList.contains("pcard")){e.preventDefault();e.target.click()}
