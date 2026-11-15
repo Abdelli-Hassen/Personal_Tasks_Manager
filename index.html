@@ -480,7 +480,7 @@ if(!Array.isArray(tasks))tasks=[];
 let projects=[];
 try{projects=JSON.parse(localStorage.getItem("suivi-projets")||"[]")}catch(e){}
 if(!Array.isArray(projects))projects=[];
-let view="days",openProj=null,impF="none";
+let view="days",openProj=null,impF="none",impD="all",impRef=todayIso;
 // vrai quand on regarde le détail d'un projet (page Projets, ou page Importance avec un projet ouvert)
 const inProj=()=>view==="projects"||(view==="importance"&&!!openProj);
 let sel=todayIso,scope="day",mode="list",statusF=new Set(),pdvF="",q="",qf="pdv",editId=null;
@@ -1000,19 +1000,43 @@ $("pform").onsubmit=()=>{
   tasks.forEach(t=>{if(picked.has(t.id))t.project=openProj});
   save();render();
 };
+// période choisie sur la page Importance : jour, semaine (comme la barre des jours), mois ou tout
+const impIn=t=>{
+  if(impD==="all")return true;
+  if(!t.date)return false;
+  if(impD==="day")return t.date===impRef;
+  if(impD==="week"){const [a,b]=weekRange(impRef);return t.date>=a&&t.date<=b}
+  return t.date.slice(0,7)===impRef.slice(0,7);
+};
+function impLabel(){
+  const cap=x=>x.charAt(0).toUpperCase()+x.slice(1);
+  if(impD==="day")return cap(fmt(impRef,{weekday:"long",day:"numeric",month:"long",year:"numeric"}));
+  if(impD==="week"){const [a,b]=weekRange(impRef);return "Semaine du "+fmt(a,{day:"numeric"})+" au "+fmt(b,{day:"numeric",month:"long",year:"numeric"})}
+  return cap(fmt(impRef,{month:"long",year:"numeric"}));
+}
+function impNav(n){
+  if(impD==="day")impRef=addDays(impRef,n);
+  else if(impD==="week"){const [a,b]=weekRange(impRef);impRef=addDays(n<0?a:b,n)}
+  else{const d=parse(impRef);d.setDate(1);d.setMonth(d.getMonth()+n);impRef=iso(d)}
+}
 // page Importance : projets (créer / ouvrir / renommer / supprimer) + liste des tâches importantes
 function renderImportance(){
   if(openProj)return renderProjects();
   const all=tasks.filter(t=>t.important);
-  const l=all.filter(t=>impF==="all"||(impF==="in"?!!t.project:!t.project))
-    .sort((a,b)=>isDone(a.status)-isDone(b.status)||byPrio(a,b));
+  const l=all.filter(t=>(impF==="all"||(impF==="in"?!!t.project:!t.project))&&impIn(t))
+    .sort((a,b)=>isDone(a.status)-isDone(b.status)||byRecent(a,b));
   const F=[["none","Hors projet"],["in","Dans un projet"],["all","Toutes"]];
+  const D=[["day","Jour"],["week","Semaine"],["month","Mois"],["all","Tout"]];
   const n=l.filter(t=>!isDone(t.status)).length;
+  const seg=(attr,cur,arr)=>`<span class="seg">${arr.map(([k,t])=>`<button ${attr}="${k}"${k===cur?' class="on"':""}>${t}</button>`).join("")}</span>`;
   return `<h3 class="ghead">📁 Projets<span>${projects.length}</span></h3>`+renderProjects()+
-    `<h3 class="ghead" style="margin-top:22px">⭐ Tâches importantes<span>${n} à faire · ${l.length} affichée(s) sur ${all.length}</span>
-      <span class="seg" style="margin-left:auto">${F.map(([k,t])=>`<button data-imp-f="${k}"${k===impF?' class="on"':""}>${t}</button>`).join("")}</span>
-      <button class="btn sm primary" data-p-new style="margin-left:0">+ Nouvelle tâche</button></h3>`+
-    (l.length?l.map(taskHtml).join(""):`<div class="empty"><b>Aucune tâche importante ici</b>${all.length?"Changez le filtre ci-dessus.":"Cliquez sur l'étoile ⭐ d'une tâche pour qu'elle apparaisse ici."}</div>`);
+    `<h3 class="ghead" style="margin-top:22px;flex-wrap:wrap">⭐ Tâches importantes<span>${n} à faire · ${l.length} affichée(s) sur ${all.length}</span>
+      <button class="btn sm primary" data-p-new style="margin-left:auto">+ Nouvelle tâche</button></h3>
+    <div class="impbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
+      ${seg("data-imp-f",impF,F)}${seg("data-imp-d",impD,D)}
+      ${impD==="all"?"":`<span style="display:inline-flex;align-items:center;gap:6px"><button class="btn sm" data-imp-nav="-1" title="Précédent">‹</button><b style="min-width:150px;text-align:center;font-size:14px">${impLabel()}</b><button class="btn sm" data-imp-nav="1" title="Suivant">›</button><button class="btn sm" data-imp-nav="0">Aujourd'hui</button></span>`}
+    </div>`+
+    (l.length?l.map(taskHtml).join(""):`<div class="empty"><b>Aucune tâche importante ici</b>${all.length?"Changez le filtre ou la période ci-dessus.":"Cliquez sur l'étoile ⭐ d'une tâche pour qu'elle apparaisse ici."}</div>`);
 }
 function render(){
   document.body.classList.toggle("pv",view!=="days");
@@ -1124,6 +1148,10 @@ $("main").onchange=e=>{
 $("main").onclick=e=>{
   const fb=e.target.closest("[data-imp-f]");
   if(fb){impF=fb.dataset.impF;render();return}
+  const db=e.target.closest("[data-imp-d]");
+  if(db){impD=db.dataset.impD;if(impD!=="all"&&!impRef)impRef=todayIso;render();return}
+  const nb=e.target.closest("[data-imp-nav]");
+  if(nb){const n=+nb.dataset.impNav;if(n===0)impRef=todayIso;else impNav(n);render();return}
   const pb=e.target.closest("[data-p-open],[data-p-back],[data-p-add],[data-p-new],[data-p-pick],[data-p-done],[data-p-urg],[data-p-rename],[data-p-del]");
   if(pb)return projectAction(pb);
   const c=e.target.closest("[data-carry]");
