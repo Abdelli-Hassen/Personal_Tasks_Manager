@@ -1042,13 +1042,13 @@ function render(){
   document.body.classList.toggle("pv",view!=="days");
   const nu=projects.filter(pUrg).length,ni=tasks.filter(isImp).length;
   $("impBtn").textContent=view==="importance"?"📅 Jours":"⭐ Importance"+(ni?` · ${ni}`:"");
+  $("projBtn").textContent=view==="projects"?"📅 Jours":"📁 Projets"+(nu?` · 🔥${nu}`:"");
   if(view==="importance"){
     const keep=$("pName")?$("pName").value:"";
     $("main").innerHTML=renderImportance();
     if(keep&&$("pName"))$("pName").value=keep;
     return;
   }
-  $("projBtn").textContent=view==="projects"?"📅 Jours":"📁 Projets"+(nu?` · 🔥${nu}`:"");
   if(view==="projects"){
     const keep=$("pName")?$("pName").value:"";
     $("main").innerHTML=renderProjects();
