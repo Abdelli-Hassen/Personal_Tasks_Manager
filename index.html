@@ -1014,10 +1014,16 @@ function impLabel(){
   if(impD==="week"){const [a,b]=weekRange(impRef);return "Semaine du "+fmt(a,{day:"numeric"})+" au "+fmt(b,{day:"numeric",month:"long",year:"numeric"})}
   return cap(fmt(impRef,{month:"long",year:"numeric"}));
 }
+// ‹ › : saute directement à la période précédente / suivante qui contient une tâche importante (selon le filtre de projet)
 function impNav(n){
-  if(impD==="day")impRef=addDays(impRef,n);
-  else if(impD==="week"){const [a,b]=weekRange(impRef);impRef=addDays(n<0?a:b,n)}
-  else{const d=parse(impRef);d.setDate(1);d.setMonth(d.getMonth()+n);impRef=iso(d)}
+  const dates=[...new Set(tasks.filter(t=>t.important&&t.date&&(impF==="all"||(impF==="in"?!!t.project:!t.project))).map(t=>t.date))].sort();
+  let lo,hi;
+  if(impD==="day")lo=hi=impRef;
+  else if(impD==="week")[lo,hi]=weekRange(impRef);
+  else{lo=impRef.slice(0,8)+"01";hi=impRef.slice(0,8)+"31"}
+  const d=n<0?dates.filter(x=>x<lo).pop():dates.find(x=>x>hi);
+  if(!d)return toast(n<0?"Aucune tâche importante avant":"Aucune tâche importante après");
+  impRef=d;
 }
 // page Importance : projets (créer / ouvrir / renommer / supprimer) + liste des tâches importantes
 function renderImportance(){
@@ -1034,7 +1040,7 @@ function renderImportance(){
       <button class="btn sm primary" data-p-new style="margin-left:auto">+ Nouvelle tâche</button></h3>
     <div class="impbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
       ${seg("data-imp-f",impF,F)}${seg("data-imp-d",impD,D)}
-      ${impD==="all"?"":`<span style="display:inline-flex;align-items:center;gap:6px"><button class="btn sm" data-imp-nav="-1" title="Précédent">‹</button><b style="min-width:150px;text-align:center;font-size:14px">${impLabel()}</b><button class="btn sm" data-imp-nav="1" title="Suivant">›</button><button class="btn sm" data-imp-nav="0">Aujourd'hui</button></span>`}
+      ${impD==="all"?"":`<span style="display:inline-flex;align-items:center;gap:6px"><button class="btn sm" data-imp-nav="-1" title="Période précédente contenant des tâches">‹</button><b style="min-width:150px;text-align:center;font-size:14px">${impLabel()}</b><button class="btn sm" data-imp-nav="1" title="Période suivante contenant des tâches">›</button><input type="date" data-imp-pick value="${impRef}" title="Aller à une date" style="width:auto"><button class="btn sm" data-imp-nav="0">Aujourd'hui</button></span>`}
     </div>`+
     (l.length?l.map(taskHtml).join(""):`<div class="empty"><b>Aucune tâche importante ici</b>${all.length?"Changez le filtre ou la période ci-dessus.":"Cliquez sur l'étoile ⭐ d'une tâche pour qu'elle apparaisse ici."}</div>`);
 }
@@ -1142,6 +1148,7 @@ $("q").oninput=e=>{q=e.target.value;render()};
 $("qf").onclick=e=>{const b=e.target.closest("button");if(b){qf=b.dataset.v;savePrefs();render()}};
 $("pdvSel").onchange=e=>{pdvF=e.target.value;render()};
 $("main").onchange=e=>{
+  if(e.target.dataset.impPick!==undefined){if(e.target.value){impRef=e.target.value;render()}return}
   if(e.target.dataset.act!=="st")return;
   setStatus(find(e.target.closest(".task").dataset.id),e.target.value);
 };
