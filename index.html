@@ -372,6 +372,8 @@ header>div:first-child{flex:0 0 100%}
     <label class="full">Projet<select name="project"></select></label>
     <label>PDV / contexte<input name="pdv" list="pdvs" required placeholder="ex. Total Gr"></label>
     <label>Situation<select name="status"></select></label>
+    <label id="doneDL">Terminée le<input type="date" name="doneDate"></label>
+    <label id="doneTL">Heure de fin<input type="time" name="doneTime"></label>
     <label class="full">Tâche<input name="task" required placeholder="Que faut-il faire ?"></label>
     <label class="full">Commentaire<input name="comment" placeholder="optionnel"></label>
     <label class="full">Lien (e-mail ou fichier)<input name="link" type="url" pattern="https?://\S+" placeholder="Collez le lien d'un e-mail ou d'un fichier  optionnel" title="Un lien commençant par http:// ou https://"></label>
@@ -1090,6 +1092,14 @@ f.time.oninput=()=>{timeTouched=true};
 // une tâche de projet peut n'avoir ni jour ni PDV
 const syncReq=()=>{const p=!!f.project.value;f.date.required=!p;f.pdv.required=!p};
 f.project.onchange=syncReq;
+// « Terminée le / Heure de fin » : visibles seulement si la situation est Résolu/Fini ; par défaut = maintenant (comme avant)
+function syncDone(){
+  const d=isDone(f.status.value);
+  $("doneDL").style.display=$("doneTL").style.display=d?"":"none";
+  if(d&&!f.doneDate.value){f.doneDate.value=todayIso;f.doneTime.value=new Date().toTimeString().slice(0,5)}
+  if(!d){f.doneDate.value="";f.doneTime.value=""}
+}
+f.status.onchange=syncDone;
 function checkLink(){
   const v=f.link.value.trim(),w=$("linkWarn");let m="";
   if(v&&mailKind(v)==="o"&&FRAGILE.test(v))m="⚠ Lien Outlook propre à un message : il cessera de s'ouvrir si l'e-mail est déplacé ou archivé. Mettez le sujet en commentaire : le bouton 🔎 retrouvera le message.";
@@ -1107,6 +1117,8 @@ function openForm(t){
   f.comment.value=t?t.comment:"";f.link.value=t?(t.link||""):"";f.status.value=t?t.status:"todo";f.urgent.checked=!!(t&&t.urgent);f.important.checked=t?!!t.important:(view==="importance"&&!openProj);
   f.time.value=t?(t.time||""):new Date().toTimeString().slice(0,5);
   timeTouched=!!t;checkLink();
+  f.doneDate.value=t&&isDone(t.status)?(t.doneDate||""):"";f.doneTime.value=t&&isDone(t.status)?(t.doneTime||""):"";
+  syncDone();
   dlg.showModal();(t?f.task:f.pdv).focus();
 }
 $("new").onclick=()=>openForm();
@@ -1122,7 +1134,10 @@ f.onsubmit=e=>{
     const t=find(editId);
     if(v.date&&t.date!==v.date)v.from=null;
     const st=v.status;delete v.status;Object.assign(t,v);stampStatus(t,st);
-  }else{const t={id:uid(),...v,status:"todo"};stampStatus(t,v.status);tasks.push(t)}
+    if(isDone(st)&&f.doneDate.value){t.doneDate=f.doneDate.value;t.doneTime=f.doneTime.value||t.doneTime||""}
+  }else{const t={id:uid(),...v,status:"todo"};stampStatus(t,v.status);
+    if(isDone(v.status)&&f.doneDate.value){t.doneDate=f.doneDate.value;t.doneTime=f.doneTime.value||t.doneTime||""}
+    tasks.push(t)}
   if(v.date)sel=v.date;save();render();
 };
 $("strip").onclick=e=>{
