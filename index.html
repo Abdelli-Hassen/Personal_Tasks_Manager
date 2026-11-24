@@ -377,7 +377,7 @@ header>div:first-child{flex:0 0 100%}
     <label class="full">Projet<select name="project"></select></label>
     <label>PDV / contexte<input name="pdv" list="pdvs" required placeholder="ex. Total Gr"></label>
     <label>Situation<select name="status"></select></label>
-    <label id="doneDL">Terminée le<input type="date" name="doneDate"></label>
+    <label id="doneDL" hidden>Terminée le<input type="date" name="doneDate"></label>
     <label id="doneTL">Heure de fin<input type="time" name="doneTime"></label>
     <div class="full" id="slaL"><div class="slalab">Délai de résolution (SLA) : fin = début + délai</div><div class="sla" id="sla"><button type="button" data-m="10">10 min</button><button type="button" data-m="15">15 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="60">1 h</button><button type="button" data-m="120">2 h</button><button type="button" data-m="0" class="on">Personnalisé</button></div></div>
     <label class="full">Tâche<input name="task" required placeholder="Que faut-il faire ?"></label>
@@ -1302,7 +1302,7 @@ f.project.onchange=syncReq;
 // « Terminée le / Heure de fin » : visibles seulement si la situation est Résolu/Fini ; par défaut = maintenant (comme avant)
 function syncDone(){
   const d=isDone(f.status.value);
-  $("doneDL").style.display=$("doneTL").style.display=$("slaL").style.display=d?"":"none";
+  $("doneTL").style.display=$("slaL").style.display=d?"":"none";
   if(d&&!f.doneDate.value){f.doneDate.value=todayIso;f.doneTime.value=new Date().toTimeString().slice(0,5)}
   if(!d){f.doneDate.value="";f.doneTime.value=""}
 }
@@ -1312,7 +1312,7 @@ const slaMark=m=>$("sla").querySelectorAll("button").forEach(b=>b.classList.togg
 $("sla").onclick=e=>{
   const b=e.target.closest("button");if(!b)return;
   const m=+b.dataset.m;slaMark(m);
-  if(!m)return f.doneDate.focus();
+  if(!m)return f.doneTime.focus();
   const base=f.date.value&&f.time.value?new Date(f.date.value+"T"+f.time.value):new Date(),end=new Date(base.getTime()+m*6e4);
   f.doneDate.value=iso(end);f.doneTime.value=pad(end.getHours())+":"+pad(end.getMinutes());
 };
