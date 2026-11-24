@@ -149,6 +149,7 @@ dialog form{padding:22px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
 dialog h2{grid-column:1/-1;margin:0;font-size:19px}
 dialog label{display:grid;gap:4px;font-size:12.5px;color:var(--mute)}
 dialog .full{grid-column:1/-1}
+dialog [hidden]{display:none!important}
 dialog .acts{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
 
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;display:flex;gap:14px;align-items:center;box-shadow:0 8px 30px rgba(0,0,0,.3);z-index:9}
@@ -331,10 +332,8 @@ header>div:first-child{flex:0 0 100%}
       <div class="pill" id="pill"><i class="dot"></i><span id="pillTxt"></span><button class="btn sm" id="pillBtn"></button><button class="btn sm" id="pillBtn2">Délier</button><button class="btn sm" id="pillBtn3" title="Recharger depuis le fichier">↻</button><button class="btn sm" id="pillBtn4" title="Copie de secours du fichier dans un dossier de votre ordinateur"></button></div>
       <details class="menu" id="expMenu"><summary class="btn" title="Exporter" aria-label="Exporter">⤓</summary>
         <div class="menubox">
-          <button data-ex="xlsx-all">Excel (.xlsx) — tout</button>
-          <button data-ex="xlsx-view">Excel (.xlsx) — vue actuelle</button>
-          <button data-ex="csv-all">CSV — tout (format du fichier lié)</button>
-          <button data-ex="csv-view">CSV — vue actuelle</button>
+          <button data-ex="rep">📄 Rapport (PDF / Excel)…</button>
+          <button data-ex="csv">CSV — sauvegarde complète</button>
         </div></details>
       <button class="btn" id="impBtn" title="Tâches importantes et projets">⭐ Importance</button>
       <button class="btn" id="projBtn">📁 Projets</button>
@@ -382,6 +381,17 @@ header>div:first-child{flex:0 0 100%}
     <label class="full urgl impl"><input type="checkbox" name="important"><span class="fire">⭐</span><span class="ut on-t">Importante : mise en avant</span><span class="ut off-t">Pas importante (cliquer pour marquer)</span></label>
     <label class="full urgl"><input type="checkbox" name="urgent"><span class="fire">🔥</span><span class="ut on-t">Urgente : allumée, en haut de la liste</span><span class="ut off-t">Pas urgente : éteinte (cliquer pour allumer)</span></label>
     <div class="acts"><button type="button" class="btn" id="cancel">Annuler</button><button class="btn primary" id="ok">Ajouter</button></div>
+  </form>
+</dialog>
+<dialog id="rep">
+  <form method="dialog" onsubmit="return false">
+    <h2>Exporter un rapport</h2>
+    <label class="full">Période<select id="repKind"><option value="day">Un jour</option><option value="week">Une semaine</option><option value="month">Un mois</option><option value="custom">Période personnalisée</option></select></label>
+    <label class="full" id="repRefL">Choisir une date dans la période<input type="date" id="repRef"></label>
+    <label id="repAL" hidden>Du<input type="date" id="repA"></label>
+    <label id="repBL" hidden>Au<input type="date" id="repB"></label>
+    <div class="full" id="repInfo" style="background:var(--accent-soft);border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.5"></div>
+    <div class="acts"><button type="button" class="btn" id="repCancel">Annuler</button><button type="button" class="btn" id="repXls">📊 Excel</button><button type="button" class="btn primary" id="repPdf">📄 PDF</button></div>
   </form>
 </dialog>
 <dialog id="ask" class="ask">
@@ -742,40 +752,230 @@ function download(blob,name){
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 function exportCsv(){download(new Blob([toCsv()],{type:"text/csv"}),"Taches accompli.csv")}
-const viewItems=()=>scoped().filter(matchStatus);
-const stamp=()=>iso(new Date());
-function flatRows(list){
-  return [...list].sort((a,b)=>a.date.localeCompare(b.date)||byTime(a,b)).map(t=>({
-    "Semaine":!t.date?"Sans jour":t.week&&t.weekLabel?t.weekLabel:weekLabel(t.date),
-    "Date":t.week?"":t.date,"Heure":t.time||"","Urgent":t.urgent?"Oui":"","Important":t.important?"Oui":"","Fini le":isDone(t.status)&&t.doneDate||"","Heure fin":isDone(t.status)&&t.doneDate&&t.doneTime||"","Projet":t.project||"","PDV":t.pdv,"Tâche":t.task,"Situation":STATUS[t.status].label,"Commentaire":t.comment,"Lien":t.link||""}));
+/* ---------- Rapport (PDF / Excel) sur une période choisie ---------- */
+const capF=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const frD=s=>s.slice(8)+"/"+s.slice(5,7)+"/"+s.slice(0,4);
+function repRange(kind,ref,a,b){
+  if(kind==="day")return [ref,ref];
+  if(kind==="week")return weekRange(ref);
+  if(kind==="month")return [ref.slice(0,8)+"01",ref.slice(0,8)+pad(new Date(+ref.slice(0,4),+ref.slice(5,7),0).getDate())];
+  return a<=b?[a,b]:[b,a];
 }
+function repLabel(kind,lo,hi){
+  if(kind==="day")return capF(fmt(lo,{weekday:"long",day:"numeric",month:"long",year:"numeric"}));
+  if(kind==="week")return "Semaine du "+fmt(lo,{day:"numeric"})+" au "+fmt(hi,{day:"numeric",month:"long",year:"numeric"});
+  if(kind==="month")return capF(fmt(lo,{month:"long",year:"numeric"}));
+  return "Du "+frD(lo)+" au "+frD(hi);
+}
+const repTasks=(lo,hi)=>tasks.filter(t=>t.date&&t.date>=lo&&t.date<=hi).sort((a,b)=>a.date.localeCompare(b.date)||byTime(a,b));
+function repCount(l){
+  const c=k=>l.filter(t=>k==="fin"?isDone(t.status):t.status===k).length,fin=c("fin");
+  return {n:l.length,fin,wip:c("wip"),conf:c("conf"),todo:c("todo"),rate:l.length?fin/l.length:0};
+}
+function repGroup(list,key,empty){
+  const m=new Map();
+  list.forEach(t=>{const k=key(t)||empty;if(!m.has(k))m.set(k,[]);m.get(k).push(t)});
+  return [...m].map(([k,l])=>({k,...repCount(l)})).sort((a,b)=>b.n-a.n||a.k.localeCompare(b.k));
+}
+function repData(lo,hi,label){
+  const list=repTasks(lo,hi),days=[];
+  list.forEach(t=>{let d=days[days.length-1];if(!d||d.date!==t.date)days.push(d={date:t.date,list:[]});d.list.push(t)});
+  return {lo,hi,label,list,days,all:repCount(list),
+    urg:list.filter(t=>t.urgent).length,imp:list.filter(t=>t.important).length,
+    byPdv:repGroup(list,t=>t.pdv,"(sans PDV)"),
+    byProj:repGroup(list.filter(t=>t.project),t=>t.project,""),
+    now:new Date().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})+" à "+new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})};
+}
+const SCOL={todo:["434D68","E4E8F2"],wip:["955500","FFEAB8"],conf:["6A2CC2","EADFFC"],ok:["0B7A43","D2F1E1"],done:["0B7A43","D2F1E1"]};
+const dayName=s=>capF(fmt(s,{weekday:"long",day:"numeric",month:"long",year:"numeric"}));
+const pct=r=>Math.round(r*100)+"%";
+
+/* ----- PDF : page de rapport imprimable (Imprimer -> Enregistrer au format PDF) ----- */
+function reportHtml(R){
+  const A=R.all,sbar=[["ok","fin","Terminées"],["conf","conf","Confirmées"],["wip","wip","En cours"],["todo","todo","À faire"]];
+  const kpi=(v,l,c)=>`<div class="k"><b style="color:#${c}">${v}</b><span>${l}</span></div>`;
+  const tbl=(rows,title)=>rows.length?`<h2>${title}</h2><table class="g"><thead><tr><th>${title.includes("projet")?"Projet":"PDV"}</th><th class="n">Total</th><th class="n">Terminées</th><th class="n">En cours</th><th class="n">Confirmées</th><th class="n">À faire</th><th style="width:26%">Avancement</th></tr></thead><tbody>${
+    rows.map(r=>`<tr><td><b>${esc(r.k)}</b></td><td class="n">${r.n}</td><td class="n">${r.fin}</td><td class="n">${r.wip}</td><td class="n">${r.conf}</td><td class="n">${r.todo}</td><td><div class="bar"><i style="width:${r.rate*100}%"></i></div><small>${pct(r.rate)}</small></td></tr>`).join("")}</tbody></table>`:"";
+  const days=R.days.map(d=>{
+    const c=repCount(d.list);
+    return `<section class="day"><div class="dh"><b>${esc(dayName(d.date))}</b><span>${c.n} tâche${c.n>1?"s":""} · ${c.fin} terminée${c.fin>1?"s":""}</span></div>
+    <table class="t"><tbody>${d.list.map(t=>{const [fg,bg]=SCOL[t.status];
+      const tags=(t.urgent&&!isDone(t.status)?`<em class="u">URGENT</em>`:"")+(t.important?`<em class="i">★ IMPORTANT</em>`:"");
+      const done=isDone(t.status)&&t.doneDate?`<small>Fini le ${frD(t.doneDate)}${t.doneTime?" à "+esc(t.doneTime):""}</small>`:"";
+      return `<tr><td class="h">${esc(t.time||"")}</td><td class="p">${esc(t.pdv)}${t.project?`<small>📁 ${esc(t.project)}</small>`:""}</td>
+        <td>${tags}${esc(t.task)}${t.comment?`<small>${esc(t.comment)}</small>`:""}</td>
+        <td class="s"><span style="color:#${fg};background:#${bg}">${STATUS[t.status].label}</span>${done}</td></tr>`}).join("")}</tbody></table></section>`;
+  }).join("");
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Rapport - ${esc(R.label)}</title><style>
+@page{size:A4;margin:14mm 12mm}
+*{box-sizing:border-box}
+body{margin:0;font:12px/1.45 "Segoe UI",system-ui,Arial,sans-serif;color:#1c2238;background:#eef0f7;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.bar0{position:sticky;top:0;z-index:5;background:#1c2238;color:#fff;padding:10px 20px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+.bar0 button{background:#6366f1;color:#fff;border:0;border-radius:8px;padding:9px 18px;font:600 14px inherit;cursor:pointer}
+.page{max-width:210mm;margin:18px auto;background:#fff;padding:0 0 12mm;box-shadow:0 6px 30px rgba(20,25,60,.15)}
+.hd{background:linear-gradient(120deg,#4f46e5,#7c3aed);color:#fff;padding:26px 30px 22px}
+.hd small{opacity:.8;letter-spacing:.14em;text-transform:uppercase;font-size:10.5px;font-weight:600}
+.hd h1{margin:4px 0 2px;font-size:26px;letter-spacing:-.02em}.hd p{margin:0;opacity:.85}
+.in{padding:0 30px}
+.ks{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:20px 0 14px}
+.k{border:1px solid #e1e4f0;border-radius:12px;padding:12px 10px;text-align:center;background:#fafbff}
+.k b{display:block;font-size:24px;line-height:1.1;letter-spacing:-.02em}.k span{font-size:10.5px;color:#68718f;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.stack{display:flex;height:12px;border-radius:99px;overflow:hidden;background:#e4e8f2}
+.stack i{display:block}
+.leg{display:flex;gap:16px;margin:8px 0 2px;font-size:11px;color:#68718f;flex-wrap:wrap}.leg u{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;text-decoration:none}
+.meta{margin:10px 0 0;color:#68718f;font-size:11.5px}
+h2{font-size:14px;margin:26px 0 8px;padding-bottom:6px;border-bottom:2px solid #e1e4f0;letter-spacing:-.01em;color:#2f3668}
+table{width:100%;border-collapse:collapse}
+.g th{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#68718f;text-align:left;padding:6px 8px;background:#f3f4fb}
+.g td{padding:7px 8px;border-bottom:1px solid #edeff7}.n{text-align:center!important;width:9%}
+.g tr{break-inside:avoid}
+.bar{height:7px;border-radius:99px;background:#e4e8f2;overflow:hidden;display:inline-block;width:70%;vertical-align:middle}.bar i{display:block;height:100%;background:#16a870}
+.g small{margin-left:8px;color:#68718f;font-weight:600}
+.day{margin-top:16px;break-inside:auto}
+.dh{display:flex;justify-content:space-between;align-items:baseline;background:#eceeff;color:#2f3668;padding:7px 12px;border-radius:9px 9px 0 0;border-left:4px solid #4f46e5;break-after:avoid}
+.dh span{font-size:11px;color:#68718f}
+.t td{padding:8px 10px;border-bottom:1px solid #edeff7;vertical-align:top}.t tr{break-inside:avoid}
+.t tr:nth-child(even) td{background:#fafbff}
+.t small{display:block;color:#68718f;font-size:10.5px;margin-top:2px}
+.h{width:46px;color:#68718f;font-weight:600;white-space:nowrap}.p{width:27%;font-weight:600}
+.s{width:104px;text-align:right}.s span{display:inline-block;padding:3px 10px;border-radius:99px;font-size:10.5px;font-weight:700}
+em{font-style:normal;font-size:9px;font-weight:800;letter-spacing:.05em;padding:2px 6px;border-radius:5px;margin-right:6px;vertical-align:1px}
+em.u{background:#ffe0dc;color:#c62828}em.i{background:#fff1c2;color:#8a6500}
+.empty{padding:40px;text-align:center;color:#68718f}
+.ft{margin:26px 30px 0;padding-top:8px;border-top:1px solid #e1e4f0;color:#8a92ad;font-size:10.5px;display:flex;justify-content:space-between}
+@media print{body{background:#fff}.bar0{display:none}.page{margin:0;max-width:none;box-shadow:none}}
+</style></head><body>
+<div class="bar0"><span>Aperçu du rapport : choisissez « Enregistrer au format PDF » comme imprimante.</span><button onclick="print()">🖨 Imprimer / Enregistrer en PDF</button></div>
+<div class="page">
+<div class="hd"><small>Rapport d'activité</small><h1>${esc(R.label)}</h1><p>Suivi des tâches · généré le ${R.now}</p></div>
+<div class="in">
+<div class="ks">${kpi(A.n,"Tâches","1c2238")}${kpi(A.fin,"Terminées","0B7A43")}${kpi(A.conf,"Confirmées","6A2CC2")}${kpi(A.wip,"En cours","955500")}${kpi(A.todo,"À faire","434D68")}${kpi(pct(A.rate),"Achèvement","4f46e5")}</div>
+${A.n?`<div class="stack">${sbar.map(([s,k])=>A[k]?`<i style="width:${A[k]/A.n*100}%;background:#${SCOL[s][0]}"></i>`:"").join("")}</div>
+<div class="leg">${sbar.map(([s,k,l])=>`<span><u style="background:#${SCOL[s][0]}"></u>${l} ${A[k]}</span>`).join("")}</div>
+<p class="meta">🔥 ${R.urg} urgente${R.urg>1?"s":""} · ★ ${R.imp} importante${R.imp>1?"s":""} · ${R.byPdv.length} PDV / contexte${R.byPdv.length>1?"s":""}${R.byProj.length?` · ${R.byProj.length} projet${R.byProj.length>1?"s":""}`:""}</p>
+${tbl(R.byPdv,"Répartition par PDV")}${tbl(R.byProj,"Répartition par projet")}
+<h2>Détail des tâches</h2>${days}`:`<div class="empty">Aucune tâche sur cette période.</div>`}
+</div><div class="ft"><span>Suivi des tâches</span><span>${esc(R.label)}</span></div></div>
+<script>addEventListener("load",()=>setTimeout(()=>print(),500))<\/script></body></html>`;
+}
+function exportPdf(R){
+  const w=window.open("","_blank");
+  if(!w)return toast("Fenêtre bloquée : autorisez les pop-ups pour ce site");
+  w.document.open();w.document.write(reportHtml(R));w.document.close();
+}
+
+/* ----- Excel : classeur mis en forme (Résumé + Détail) ----- */
 function loadXlsx(){
-  if(window.XLSX)return Promise.resolve();
+  if(window.XLSX&&XLSX.__style)return Promise.resolve();
   return new Promise((res,rej)=>{
     const s=document.createElement("script");
-    s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
-    s.onload=res;s.onerror=()=>rej(new Error("Bibliothèque Excel indisponible (connexion ?)"));
+    s.src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js";
+    s.onload=()=>{XLSX.__style=1;res()};s.onerror=()=>rej(new Error("Bibliothèque Excel indisponible (connexion ?)"));
     document.head.appendChild(s);
   });
 }
-async function exportXlsx(list,name){
+async function exportXlsx(R){
   try{await loadXlsx()}catch(e){return toast(e.message)}
-  const rows=flatRows(list);
-  const ws=XLSX.utils.json_to_sheet(rows,{header:["Semaine","Date","Heure","Urgent","Important","Fini le","Heure fin","Projet","PDV","Tâche","Situation","Commentaire","Lien"]});
-  ws["!cols"]=[{wch:22},{wch:12},{wch:8},{wch:8},{wch:12},{wch:9},{wch:18},{wch:18},{wch:60},{wch:12},{wch:34}];
-  ws["!autofilter"]={ref:ws["!ref"]};
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Tâches");
-  XLSX.writeFile(wb,name);
-  toast(rows.length+" tâche(s) exportée(s)");
+  const B=(c="E1E4F0")=>({style:"thin",color:{rgb:c}}),box={top:B(),bottom:B(),left:B(),right:B()};
+  const F=(rgb)=>({fill:{patternType:"solid",fgColor:{rgb}}});
+  const st={
+    title:{font:{bold:true,sz:20,color:{rgb:"FFFFFF"}},...F("4F46E5"),alignment:{vertical:"center",indent:1}},
+    sub:{font:{sz:11,color:{rgb:"E6E8FF"}},...F("4F46E5"),alignment:{vertical:"center",indent:1}},
+    sec:{font:{bold:true,sz:12,color:{rgb:"2F3668"}},...F("ECEEFF"),alignment:{vertical:"center",indent:1},border:{left:{style:"thick",color:{rgb:"4F46E5"}}}},
+    kl:{font:{bold:true,sz:9,color:{rgb:"68718F"}},...F("FAFBFF"),alignment:{horizontal:"center",vertical:"center"},border:box},
+    th:{font:{bold:true,sz:10,color:{rgb:"FFFFFF"}},...F("2F3668"),alignment:{horizontal:"center",vertical:"center",wrapText:true},border:box},
+    td:{font:{sz:10.5},alignment:{vertical:"top",wrapText:true},border:box},
+    tc:{font:{sz:10.5},alignment:{horizontal:"center",vertical:"top"},border:box}
+  };
+  const mk=()=>{const ws={};let r=0,c=0;return {ws,
+    put(R_,C_,v,s,x){ws[XLSX.utils.encode_cell({r:R_,c:C_})]={v,t:typeof v==="number"?"n":"s",s,...x};r=Math.max(r,R_);c=Math.max(c,C_)},
+    end(){ws["!ref"]=XLSX.utils.encode_range({s:{r:0,c:0},e:{r,c}});return ws}}};
+  const A=R.all,wb=XLSX.utils.book_new();
+
+  /* feuille Résumé */
+  const S=mk(),NC=8;
+  const band=(row,text,s,h)=>{for(let c=0;c<NC;c++)S.put(row,c,c?"":text,s);(S.ws["!merges"]??=[]).push({s:{r:row,c:0},e:{r:row,c:NC-1}});(S.ws["!rows"]??=[])[row]={hpt:h}};
+  band(0,"Rapport d'activité",st.title,38);band(1,R.label,{...st.sub,font:{bold:true,sz:14,color:{rgb:"FFFFFF"}}},26);band(2,"Généré le "+R.now,st.sub,20);
+  const K=[["TÂCHES",A.n,"1C2238"],["TERMINÉES",A.fin,"0B7A43"],["CONFIRMÉES",A.conf,"6A2CC2"],["EN COURS",A.wip,"955500"],["À FAIRE",A.todo,"434D68"],["ACHÈVEMENT",A.rate,"4F46E5"],["URGENTES",R.urg,"C62828"],["IMPORTANTES",R.imp,"B8860B"]];
+  K.forEach(([l,v,c],i)=>{S.put(4,i,l,st.kl);S.put(5,i,v,{font:{bold:true,sz:22,color:{rgb:c}},...F("FAFBFF"),alignment:{horizontal:"center",vertical:"center"},border:box},i===5?{z:"0%"}:{})});
+  S.ws["!rows"][4]={hpt:20};S.ws["!rows"][5]={hpt:42};
+  let row=7;
+  const table=(rows,title,first)=>{
+    if(!rows.length)return;
+    band(row,title,st.sec,24);row++;
+    [first,"Total","Terminées","En cours","Confirmées","À faire","Achèvement"].forEach((h,i)=>S.put(row,i,h,st.th));row++;
+    rows.forEach((r,i)=>{
+      const z=i%2?F("FAFBFF"):{};
+      [r.k,r.n,r.fin,r.wip,r.conf,r.todo].forEach((v,c)=>S.put(row,c,v,{...(c?st.tc:st.td),...z,font:{sz:10.5,bold:c===0}}));
+      S.put(row,6,r.rate,{...st.tc,...z,font:{bold:true,sz:10.5,color:{rgb:r.rate>=1?"0B7A43":r.rate>=.5?"955500":"C62828"}}},{z:"0%"});
+      row++;
+    });
+    row++;
+  };
+  table(R.byPdv,"Répartition par PDV","PDV / contexte");
+  table(R.byProj,"Répartition par projet","Projet");
+  S.ws["!cols"]=[{wch:30},{wch:14},{wch:14},{wch:14},{wch:14},{wch:14},{wch:15},{wch:15}];
+  XLSX.utils.book_append_sheet(wb,S.end(),"Résumé");
+
+  /* feuille Détail */
+  const D=mk(),H=["Jour","Heure","PDV / contexte","Tâche","Projet","Situation","Commentaire","Terminée le","Priorité","Lien"],ND=H.length;
+  for(let c=0;c<ND;c++){D.put(0,c,c?"":"Détail des tâches · "+R.label,st.title);D.put(1,c,"",st.sub)}
+  D.ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:ND-1}},{s:{r:1,c:0},e:{r:1,c:ND-1}}];
+  D.put(1,0,A.n+" tâche(s) · "+A.fin+" terminée(s) · achèvement "+pct(A.rate),st.sub);
+  D.ws["!rows"]=[{hpt:34},{hpt:20},{hpt:8},{hpt:26}];
+  H.forEach((h,c)=>D.put(3,c,h,st.th));
+  let r=4,band_=0;
+  R.days.forEach(d=>{
+    d.list.forEach((t,i)=>{
+      const fill=band_%2?F("F6F7FC"):F("FFFFFF"),top=i===0?{top:{style:"medium",color:{rgb:"4F46E5"}}}:{},bd={...box,...top},[fg,bg]=SCOL[t.status];
+      const base={...st.td,...fill,border:bd},ctr={...st.tc,...fill,border:bd};
+      D.put(r,0,dayName(d.date),{...base,font:{sz:10.5,bold:i===0,color:{rgb:i===0?"2F3668":"A0A7C0"}}});
+      D.put(r,1,t.time||"",ctr);D.put(r,2,t.pdv,{...base,font:{sz:10.5,bold:true}});D.put(r,3,t.task,base);
+      D.put(r,4,t.project||"",base);
+      D.put(r,5,STATUS[t.status].label,{font:{bold:true,sz:10,color:{rgb:fg}},...F(bg),alignment:{horizontal:"center",vertical:"top"},border:bd});
+      D.put(r,6,t.comment||"",{...base,font:{sz:10,color:{rgb:"68718F"}}});
+      D.put(r,7,isDone(t.status)&&t.doneDate?frD(t.doneDate)+(t.doneTime?" "+t.doneTime:""):"",ctr);
+      D.put(r,8,[t.urgent&&!isDone(t.status)?"🔥 Urgent":"",t.important?"⭐ Important":""].filter(Boolean).join(" · "),{...ctr,font:{sz:10,bold:true,color:{rgb:"B8860B"}}});
+      const ok=safeUrl(t.link);
+      D.put(r,9,ok?"Ouvrir":"",{...ctr,font:{sz:10,underline:true,color:{rgb:"4F46E5"}}},ok?{l:{Target:ok,Tooltip:ok}}:{});
+      r++;
+    });
+    band_++;
+  });
+  D.ws["!cols"]=[{wch:30},{wch:8},{wch:24},{wch:54},{wch:20},{wch:13},{wch:42},{wch:17},{wch:22},{wch:10}];
+  D.ws["!freeze"]={xSplit:"0",ySplit:"4",topLeftCell:"A5",activePane:"bottomLeft",state:"frozen"};
+  if(r>4)D.ws["!autofilter"]={ref:`A4:${XLSX.utils.encode_col(ND-1)}${r}`};
+  XLSX.utils.book_append_sheet(wb,D.end(),"Détail");
+  XLSX.writeFile(wb,("Rapport - "+R.label).replace(/[\\/:*?"<>|]/g,"-")+".xlsx");
+  toast("Rapport Excel exporté ("+A.n+" tâche"+(A.n>1?"s":"")+")");
 }
+
+/* ----- fenêtre « Exporter un rapport » ----- */
+function repCur(){
+  const k=$("repKind").value,[lo,hi]=repRange(k,$("repRef").value||todayIso,$("repA").value||todayIso,$("repB").value||todayIso);
+  return repData(lo,hi,repLabel(k,lo,hi));
+}
+function repUpd(){
+  const k=$("repKind").value;
+  $("repRefL").hidden=k==="custom";$("repAL").hidden=$("repBL").hidden=k!=="custom";
+  const R=repCur();
+  $("repInfo").innerHTML=`<b>${esc(R.label)}</b><br>${R.all.n} tâche${R.all.n>1?"s":""} · ${R.all.fin} terminée${R.all.fin>1?"s":""} · ${frD(R.lo)} → ${frD(R.hi)}`;
+  $("repXls").disabled=$("repPdf").disabled=!R.all.n;
+}
+function repOpen(){
+  $("repKind").value=scope==="week"?"week":scope==="day"?"day":"month";
+  $("repRef").value=$("repA").value=$("repB").value=sel;
+  repUpd();$("rep").showModal();
+}
+["repKind","repRef","repA","repB"].forEach(id=>{$(id).oninput=repUpd;$(id).onchange=repUpd});
+$("repCancel").onclick=()=>$("rep").close();
+$("repPdf").onclick=()=>{const R=repCur();$("rep").close();exportPdf(R)};
+$("repXls").onclick=()=>{const R=repCur();$("rep").close();exportXlsx(R)};
 $("expMenu").onclick=e=>{
   const b=e.target.closest("[data-ex]");if(!b)return;
   $("expMenu").open=false;
-  const [fmtX,what]=b.dataset.ex.split("-"),list=what==="all"?tasks:viewItems();
-  if(!list.length)return toast("Rien à exporter avec ce filtre");
-  if(fmtX==="xlsx")exportXlsx(list,`Taches ${stamp()}.xlsx`);
-  else if(what==="all")exportCsv();
-  else download(new Blob(["﻿"+[Object.keys(flatRows(list)[0]),...flatRows(list).map(Object.values)].map(r=>r.map(cell).join(";")).join("\r\n")],{type:"text/csv"}),`Taches ${stamp()}.csv`);
+  if(b.dataset.ex==="rep")repOpen();
+  else if(tasks.length)exportCsv();else toast("Rien à exporter");
 };
 document.addEventListener("click",e=>{
   document.querySelectorAll("details.menu").forEach(m=>{if(!m.contains(e.target))m.open=false});
