@@ -774,7 +774,15 @@ function repLabel(kind,lo,hi){
   if(kind==="month")return capF(fmt(lo,{month:"long",year:"numeric"}));
   return "Du "+frD(lo)+" au "+frD(hi);
 }
-const repTasks=(lo,hi)=>tasks.filter(t=>t.date&&t.date>=lo&&t.date<=hi).sort((a,b)=>a.date.localeCompare(b.date)||byTime(a,b));
+// Tâches liées à la période : prévues dans la période, ou terminées dans la période (comme la vue du jour).
+// Les tâches « semaine seulement » (jour inconnu) ne comptent pas pour un jour précis.
+const repTasks=(lo,hi)=>tasks.filter(t=>{
+  if(!t.date)return false;
+  const d=doneOn(t);
+  if(d&&d>=lo&&d<=hi)return true;
+  if(t.week){const [a,b]=range(t);return lo!==hi&&a<=hi&&b>=lo}
+  return t.date>=lo&&t.date<=hi;
+}).sort((a,b)=>a.date.localeCompare(b.date)||byTime(a,b));
 function repCount(l){
   const c=k=>l.filter(t=>k==="fin"?isDone(t.status):t.status===k).length,fin=c("fin");
   return {n:l.length,fin,wip:c("wip"),conf:c("conf"),todo:c("todo"),rate:l.length?fin/l.length:0};
@@ -785,8 +793,9 @@ function repGroup(list,key,empty){
   return [...m].map(([k,l])=>({k,...repCount(l)})).sort((a,b)=>b.n-a.n||a.k.localeCompare(b.k));
 }
 function repData(lo,hi,label){
-  const list=repTasks(lo,hi),days=[];
-  list.forEach(t=>{let d=days[days.length-1];if(!d||d.date!==t.date)days.push(d={date:t.date,list:[]});d.list.push(t)});
+  const dayOf=t=>{const d=doneOn(t);return !t.week&&t.date>=lo&&t.date<=hi?t.date:d&&d>=lo&&d<=hi?d:t.date<lo?lo:t.date};
+  const list=repTasks(lo,hi).sort((a,b)=>dayOf(a).localeCompare(dayOf(b))||byTime(a,b)),days=[];
+  list.forEach(t=>{const k=dayOf(t);let d=days[days.length-1];if(!d||d.date!==k)days.push(d={date:k,list:[]});d.list.push(t)});
   return {lo,hi,label,list,days,all:repCount(list),
     urg:list.filter(t=>t.urgent).length,imp:list.filter(t=>t.important).length,
     byPdv:repGroup(list,t=>t.pdv,"(sans PDV)"),
