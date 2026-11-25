@@ -151,7 +151,7 @@ dialog label{display:grid;gap:4px;font-size:12.5px;color:var(--mute)}
 dialog .full{grid-column:1/-1}
 dialog [hidden]{display:none!important}
 .slalab{font-size:12px;font-weight:650;letter-spacing:.02em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
-.slac{display:flex;gap:8px;margin-top:8px}.slac input{width:90px}.slac select{flex:1}
+.slac{display:flex;gap:8px;margin-top:8px}.slac label{flex:1}.slac input{width:100%}
 .sla{display:flex;flex-wrap:wrap;gap:6px}
 .sla button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:7px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
 .sla button:hover{border-color:var(--accent)}
@@ -381,7 +381,7 @@ header>div:first-child{flex:0 0 100%}
     <label id="doneDL" hidden>Terminée le<input type="date" name="doneDate"></label>
     <label id="doneTL">Heure de fin<input type="time" name="doneTime"></label>
     <div class="full" id="slaL"><div class="slalab">Délai de résolution (SLA) : fin = début + délai</div><div class="sla" id="sla"><button type="button" data-m="10">10 min</button><button type="button" data-m="15">15 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="60">1 h</button><button type="button" data-m="120">2 h</button><button type="button" data-m="0">Personnalisé</button></div>
-      <div class="slac" id="slac" hidden><input type="number" id="slaN" min="1" step="1" value="1" aria-label="Durée"><select id="slaU"><option value="1">minutes</option><option value="60" selected>heures</option><option value="1440">jours</option></select></div></div>
+      <div class="slac" id="slac" hidden><label>Jours<input type="number" id="slaD" min="0" step="1" value="0"></label><label>Heures<input type="number" id="slaH" min="0" step="1" value="1"></label><label>Minutes<input type="number" id="slaM" min="0" step="1" value="0"></label></div></div>
     <label class="full">Tâche<input name="task" required placeholder="Que faut-il faire ?"></label>
     <label class="full">Commentaire<input name="comment" placeholder="optionnel"></label>
     <label class="full">Lien (e-mail ou fichier)<input name="link" type="url" pattern="https?://\S+" placeholder="Collez le lien d'un e-mail ou d'un fichier  optionnel" title="Un lien commençant par http:// ou https://"></label>
@@ -1328,9 +1328,10 @@ function slaApply(min){
 $("sla").onclick=e=>{
   const b=e.target.closest("button");if(!b)return;
   const m=+b.dataset.m;slaMark(m);
-  if(m)slaApply(m);else{$("slaN").focus();$("slaN").select();slaApply($("slaN").value*$("slaU").value)}
+  if(m)slaApply(m);else{slaCustom();$("slaD").focus();$("slaD").select()}
 };
-$("slaN").oninput=$("slaU").onchange=()=>slaApply($("slaN").value*$("slaU").value);
+const slaCustom=()=>slaApply(+$("slaD").value*1440+$("slaH").value*60+ +$("slaM").value);
+["slaD","slaH","slaM"].forEach(i=>$(i).oninput=slaCustom);
 f.doneTime.addEventListener("input",()=>slaMark(-1));
 function checkLink(){
   const v=f.link.value.trim(),w=$("linkWarn");let m="";
