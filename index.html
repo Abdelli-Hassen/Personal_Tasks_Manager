@@ -150,6 +150,7 @@ dialog h2{grid-column:1/-1;margin:0;font-size:19px}
 dialog label{display:grid;gap:4px;font-size:12.5px;color:var(--mute)}
 dialog .full{grid-column:1/-1}
 dialog [hidden]{display:none!important}
+.slalab b{color:var(--accent);text-transform:none;letter-spacing:0;font-size:13px;margin-left:6px}
 .slalab{font-size:12px;font-weight:650;letter-spacing:.02em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
 .slac{display:flex;gap:8px;margin-top:8px}.slac label{flex:1}.slac input{width:100%}
 .sla{display:flex;flex-wrap:wrap;gap:6px}
@@ -379,8 +380,7 @@ header>div:first-child{flex:0 0 100%}
     <label>PDV / contexte<input name="pdv" list="pdvs" required placeholder="ex. Total Gr"></label>
     <label>Situation<select name="status"></select></label>
     <label id="doneDL" hidden>Terminée le<input type="date" name="doneDate"></label>
-    <label id="doneTL">Heure de fin<input type="time" name="doneTime"></label>
-    <div class="full" id="slaL"><div class="slalab">Délai de résolution (SLA) : fin = début + délai</div><div class="sla" id="sla"><button type="button" data-m="10">10 min</button><button type="button" data-m="15">15 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="60">1 h</button><button type="button" data-m="120">2 h</button><button type="button" data-m="0">Personnalisé</button></div>
+    <div class="full" id="slaL"><div class="slalab">Temps passé pour résoudre (SLA) <b id="slaOut"></b></div><input type="hidden" id="slaV"><div class="sla" id="sla"><button type="button" data-m="10">10 min</button><button type="button" data-m="15">15 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="60">1 h</button><button type="button" data-m="120">2 h</button><button type="button" data-m="0">Personnalisé</button></div>
       <div class="slac" id="slac" hidden><label>Jours<input type="number" id="slaD" min="0" step="1" value="0"></label><label>Heures<input type="number" id="slaH" min="0" step="1" value="1"></label><label>Minutes<input type="number" id="slaM" min="0" step="1" value="0"></label></div></div>
     <label class="full">Tâche<input name="task" required placeholder="Que faut-il faire ?"></label>
     <label class="full">Commentaire<input name="comment" placeholder="optionnel"></label>
@@ -528,7 +528,7 @@ function cleanPdvs(){
 }
 
 /* ---------- CSV <-> tâches ---------- */
-const HEADER=["Week-date","PDV","Tache","Situation","commentaire","Date","Heure","Urgent","Fait le","Heure fin","Depuis","Projet","Lien","Important"];
+const HEADER=["Week-date","PDV","Tache","Situation","commentaire","Date","Heure","Urgent","Fait le","Heure fin","Depuis","Projet","Lien","Important","SLA (min)"];
 const NODAY="Sans jour (projets)";
 const isUrg=t=>t.urgent&&!isDone(t.status);
 const isImp=t=>t.important&&!isDone(t.status);
@@ -563,14 +563,14 @@ function fromCsv(text){
   const sep=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?";":",";
   const out=[],projs=[];let label=null,start=null;
   parseCsv(text,sep).forEach((r,i)=>{
-    const [a,pdv,task,st,cm,dcol,tcol,ucol,fdate,ftime,from,proj,lien,impc]=r.map(x=>(x||"").trim());
+    const [a,pdv,task,st,cm,dcol,tcol,ucol,fdate,ftime,from,proj,lien,impc,slac]=r.map(x=>(x||"").trim());
     if(a==="#PROJET"){projs.push({name:pdv,done:norm(st)==="termine",doneDate:parseDate(fdate)||"",urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||"")});return}
     if(i===0&&norm(task)==="tache")return;
     if(a&&!pdv&&!task){label=a;start=labelStart(a);return}
     if(!pdv&&!task)return;
     const d=parseDate(dcol)||parseDate(a);
     const nod=!d&&label===NODAY;
-    out.push({id:uid(),project:proj||"",link:safeUrl(lien),date:d||(nod?"":start||todayIso),week:!d&&!nod,weekLabel:d||nod?null:label,pdv,task,status:BYLABEL[norm(st)]||"todo",comment:cm||"",time:parseTime(tcol),urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||""),important:/^(oui|yes|1|x|true|important)$/i.test(impc||""),doneDate:isDone(BYLABEL[norm(st)]||"todo")?parseDate(fdate):null,doneTime:parseTime(ftime),from:parseDate(from)});
+    out.push({id:uid(),project:proj||"",link:safeUrl(lien),date:d||(nod?"":start||todayIso),week:!d&&!nod,weekLabel:d||nod?null:label,pdv,task,status:BYLABEL[norm(st)]||"todo",comment:cm||"",time:parseTime(tcol),urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||""),important:/^(oui|yes|1|x|true|important)$/i.test(impc||""),doneDate:isDone(BYLABEL[norm(st)]||"todo")?parseDate(fdate):null,doneTime:parseTime(ftime),sla:isDone(BYLABEL[norm(st)]||"todo")?+slac||0:0,from:parseDate(from)});
   });
   fromCsv.projects=projs;
   return out;
@@ -584,10 +584,10 @@ function toCsv(){
   });
   const key=l=>labelStart(l)||"9999";
   const rows=[HEADER];
-  projects.forEach(p=>rows.push(["#PROJET",p.name,"",p.done?"Terminé":"","","","",p.urgent?"Oui":"",p.done&&p.doneDate||"","","","","",""]));
+  projects.forEach(p=>rows.push(["#PROJET",p.name,"",p.done?"Terminé":"","","","",p.urgent?"Oui":"",p.done&&p.doneDate||"","","","","","",""]));
   [...groups.entries()].sort((x,y)=>key(x[0]).localeCompare(key(y[0]))).forEach(([label,list])=>{
-    rows.push([label,"","","","","","","","","","","","",""]);
-    [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":"",isDone(t.status)&&t.doneDate||"",isDone(t.status)&&t.doneDate&&t.doneTime||"",t.from||"",t.project||"",t.link||"",t.important?"Oui":""]));
+    rows.push([label,"","","","","","","","","","","","","",""]);
+    [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":"",isDone(t.status)&&t.doneDate||"",isDone(t.status)&&t.doneDate&&t.doneTime||"",t.from||"",t.project||"",t.link||"",t.important?"Oui":"",isDone(t.status)&&t.sla||""]));
   });
   return "﻿"+rows.map(r=>r.map(cell).join(";")).join("\r\n")+"\r\n";
 }
@@ -819,7 +819,7 @@ function reportHtml(R){
     return `<section class="day"><div class="dh"><b>${esc(dayName(d.date))}</b><span>${c.n} tâche${c.n>1?"s":""} · ${c.fin} terminée${c.fin>1?"s":""}</span></div>
     <table class="t"><tbody>${d.list.map(t=>{const [fg,bg]=SCOL[t.status];
       const tags=(t.urgent&&!isDone(t.status)?`<em class="u">URGENT</em>`:"")+(t.important?`<em class="i">★ IMPORTANT</em>`:"");
-      const done=isDone(t.status)&&t.doneDate?`<small>Fini le ${frD(t.doneDate)}${t.doneTime?" à "+esc(t.doneTime):""}</small>`:"";
+      const done=isDone(t.status)&&t.doneDate?`<small>Fini le ${frD(t.doneDate)}${t.sla?" · ⏱ "+fmtSla(t.sla):""}</small>`:"";
       return `<tr><td class="h">${esc(t.time||"")}</td><td class="p">${esc(t.pdv)}${t.project?`<small>📁 ${esc(t.project)}</small>`:""}</td>
         <td>${tags}${esc(t.task)}${t.comment?`<small>${esc(t.comment)}</small>`:""}</td>
         <td class="s"><span style="color:#${fg};background:#${bg}">${STATUS[t.status].label}</span>${done}</td></tr>`}).join("")}</tbody></table></section>`;
@@ -936,7 +936,7 @@ async function exportXlsx(R){
   XLSX.utils.book_append_sheet(wb,S.end(),"Résumé");
 
   /* feuille Détail */
-  const D=mk(),H=["Jour","Heure","PDV / contexte","Tâche","Projet","Situation","Commentaire","Terminée le","Priorité","Lien"],ND=H.length;
+  const D=mk(),H=["Jour","Heure","PDV / contexte","Tâche","Projet","Situation","Commentaire","Terminée le","Temps passé (SLA)","Priorité","Lien"],ND=H.length;
   for(let c=0;c<ND;c++){D.put(0,c,c?"":"Détail des tâches · "+R.label,st.title);D.put(1,c,"",st.sub)}
   D.ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:ND-1}},{s:{r:1,c:0},e:{r:1,c:ND-1}}];
   D.put(1,0,A.n+" tâche(s) · "+A.fin+" terminée(s) · achèvement "+pct(A.rate),st.sub);
@@ -952,15 +952,16 @@ async function exportXlsx(R){
       D.put(r,4,t.project||"",base);
       D.put(r,5,STATUS[t.status].label,{font:{bold:true,sz:10,color:{rgb:fg}},...F(bg),alignment:{horizontal:"center",vertical:"top"},border:bd});
       D.put(r,6,t.comment||"",{...base,font:{sz:10,color:{rgb:"68718F"}}});
-      D.put(r,7,isDone(t.status)&&t.doneDate?frD(t.doneDate)+(t.doneTime?" "+t.doneTime:""):"",ctr);
-      D.put(r,8,[t.urgent&&!isDone(t.status)?"🔥 Urgent":"",t.important?"⭐ Important":""].filter(Boolean).join(" · "),{...ctr,font:{sz:10,bold:true,color:{rgb:"B8860B"}}});
+      D.put(r,7,isDone(t.status)&&t.doneDate?frD(t.doneDate):"",ctr);
+      D.put(r,8,isDone(t.status)?fmtSla(t.sla):"",ctr);
+      D.put(r,9,[t.urgent&&!isDone(t.status)?"🔥 Urgent":"",t.important?"⭐ Important":""].filter(Boolean).join(" · "),{...ctr,font:{sz:10,bold:true,color:{rgb:"B8860B"}}});
       const ok=safeUrl(t.link);
-      D.put(r,9,ok?"Ouvrir":"",{...ctr,font:{sz:10,underline:true,color:{rgb:"4F46E5"}}},ok?{l:{Target:ok,Tooltip:ok}}:{});
+      D.put(r,10,ok?"Ouvrir":"",{...ctr,font:{sz:10,underline:true,color:{rgb:"4F46E5"}}},ok?{l:{Target:ok,Tooltip:ok}}:{});
       r++;
     });
     band_++;
   });
-  D.ws["!cols"]=[{wch:30},{wch:8},{wch:24},{wch:54},{wch:20},{wch:13},{wch:42},{wch:17},{wch:22},{wch:10}];
+  D.ws["!cols"]=[{wch:30},{wch:8},{wch:24},{wch:54},{wch:20},{wch:13},{wch:42},{wch:15},{wch:18},{wch:22},{wch:10}];
   D.ws["!freeze"]={xSplit:"0",ySplit:"4",topLeftCell:"A5",activePane:"bottomLeft",state:"frozen"};
   if(r>4)D.ws["!autofilter"]={ref:`A4:${XLSX.utils.encode_col(ND-1)}${r}`};
   XLSX.utils.book_append_sheet(wb,D.end(),"Détail");
@@ -1088,7 +1089,7 @@ function renderControls(){
 // période : début (jour de la tâche, ou jour d'origine si reportée) -> fin (jour + heure du clic sur Terminé)
 function period(t){
   if(!isDone(t.status)||!t.doneDate)return "";
-  const d=s=>fmt(s,{weekday:"short",day:"numeric",month:"short"}),at=t.doneTime?" à "+t.doneTime:"";
+  const d=s=>fmt(s,{weekday:"short",day:"numeric",month:"short"}),at=t.sla?" · ⏱ "+fmtSla(t.sla):"";
   const a=t.week?null:(t.from||t.date);
   if(!a||a===t.doneDate)return `Fini le ${d(t.doneDate)}${at}`;
   const n=Math.round((parse(t.doneDate)-parse(a))/864e5);
@@ -1297,8 +1298,8 @@ $("toastBtn").onclick=()=>{if(snap){tasks=JSON.parse(snap);if(snapP)projects=JSO
 const find=id=>tasks.find(t=>t.id===id);
 // l'heure du clic sur « terminé » est mémorisée ; rouvrir la tâche l'efface
 function stampStatus(t,s){
-  if(isDone(s)&&!isDone(t.status)){t.doneDate=todayIso;t.doneTime=new Date().toTimeString().slice(0,5)}
-  else if(!isDone(s)){t.doneDate=null;t.doneTime=""}
+  if(isDone(s)&&!isDone(t.status)){t.doneDate=todayIso;t.doneTime="";t.sla=0}
+  else if(!isDone(s)){t.doneDate=null;t.doneTime="";t.sla=0}
   t.status=s;
 }
 function setStatus(t,s){stampStatus(t,s);save();render()}
@@ -1310,29 +1311,36 @@ f.time.oninput=()=>{timeTouched=true};
 // une tâche de projet peut n'avoir ni jour ni PDV
 const syncReq=()=>{const p=!!f.project.value;f.date.required=!p;f.pdv.required=!p};
 f.project.onchange=syncReq;
-// « Terminée le / Heure de fin » : visibles seulement si la situation est Résolu/Fini ; par défaut = maintenant (comme avant)
+// SLA = temps passé pour résoudre la tâche (minutes). Visible seulement si la situation est Résolu/Fini.
+// Le jour de fin est enregistré automatiquement (aujourd'hui, ou celui déjà enregistré).
+const fmtSla=m=>{m=Math.round(+m||0);if(!m)return "";const d=Math.floor(m/1440),h=Math.floor(m%1440/60),n=m%60;return [d&&d+" j",h&&h+" h",n&&n+" min"].filter(Boolean).join(" ")};
+const slaMark=m=>{$("sla").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===String(m)));$("slac").hidden=m!==0};
+function slaSet(min,mark){
+  min=Math.max(0,Math.round(+min||0));$("slaV").value=min||"";$("slaOut").textContent=min?"· "+fmtSla(min):"";
+  if(mark!==false)slaMark(!min?-1:[10,15,30,60,120].includes(min)&&$("slac").hidden?min:0);
+}
 function syncDone(){
   const d=isDone(f.status.value);
-  $("doneTL").style.display=$("slaL").style.display=d?"":"none";
-  if(d&&!f.doneDate.value){f.doneDate.value=todayIso;f.doneTime.value=new Date().toTimeString().slice(0,5)}
-  if(!d){f.doneDate.value="";f.doneTime.value=""}
+  $("slaL").style.display=d?"":"none";
+  if(d&&!f.doneDate.value)f.doneDate.value=todayIso;
+  if(!d){f.doneDate.value="";slaSet(0)}
 }
 f.status.onchange=syncDone;
-// SLA : fin = heure de début de la tâche (sinon maintenant) + délai choisi ; « Personnalisé » = nombre de minutes / heures / jours
-const slaMark=m=>{$("sla").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===String(m)));$("slac").hidden=m!==0};
-function slaApply(min){
-  if(!(min>0))return;
-  const base=f.date.value&&f.time.value?new Date(f.date.value+"T"+f.time.value):new Date(),end=new Date(base.getTime()+min*6e4);
-  f.doneDate.value=iso(end);f.doneTime.value=pad(end.getHours())+":"+pad(end.getMinutes());
-}
+const slaCustom=()=>slaSet(+$("slaD").value*1440+$("slaH").value*60+ +$("slaM").value,false);
 $("sla").onclick=e=>{
   const b=e.target.closest("button");if(!b)return;
-  const m=+b.dataset.m;slaMark(m);
-  if(m)slaApply(m);else{slaCustom();$("slaD").focus();$("slaD").select()}
+  const m=+b.dataset.m;
+  if(m){slaMark(m);slaSet(m,false)}
+  else{slaMark(0);slaCustom();$("slaD").focus();$("slaD").select()}
 };
-const slaCustom=()=>slaApply(+$("slaD").value*1440+$("slaH").value*60+ +$("slaM").value);
 ["slaD","slaH","slaM"].forEach(i=>$(i).oninput=slaCustom);
-f.doneTime.addEventListener("input",()=>slaMark(-1));
+// ouverture d'une tâche : replace le choix SLA enregistré
+function slaLoad(min){
+  min=+min||0;slaSet(min,false);
+  if(!min)return slaMark(-1);
+  if([10,15,30,60,120].includes(min))return slaMark(min);
+  slaMark(0);$("slaD").value=Math.floor(min/1440);$("slaH").value=Math.floor(min%1440/60);$("slaM").value=min%60;
+}
 function checkLink(){
   const v=f.link.value.trim(),w=$("linkWarn");let m="";
   if(v&&mailKind(v)==="o"&&FRAGILE.test(v))m="⚠ Lien Outlook propre à un message : il cessera de s'ouvrir si l'e-mail est déplacé ou archivé. Mettez le sujet en commentaire : le bouton 🔎 retrouvera le message.";
@@ -1350,8 +1358,7 @@ function openForm(t){
   f.comment.value=t?t.comment:"";f.link.value=t?(t.link||""):"";f.status.value=t?t.status:"todo";f.urgent.checked=!!(t&&t.urgent);f.important.checked=t?!!t.important:(view==="importance"&&!openProj);
   f.time.value=t?(t.time||""):new Date().toTimeString().slice(0,5);
   timeTouched=!!t;checkLink();
-  slaMark(-1);
-  f.doneDate.value=t&&isDone(t.status)?(t.doneDate||""):"";f.doneTime.value=t&&isDone(t.status)?(t.doneTime||""):"";
+  f.doneDate.value=t&&isDone(t.status)?(t.doneDate||""):"";slaLoad(t&&isDone(t.status)?t.sla:0);
   syncDone();
   dlg.showModal();(t?f.task:f.pdv).focus();
 }
@@ -1368,9 +1375,9 @@ f.onsubmit=e=>{
     const t=find(editId);
     if(v.date&&t.date!==v.date)v.from=null;
     const st=v.status;delete v.status;Object.assign(t,v);stampStatus(t,st);
-    if(isDone(st)&&f.doneDate.value){t.doneDate=f.doneDate.value;t.doneTime=f.doneTime.value||t.doneTime||""}
+    if(isDone(st)){if(f.doneDate.value)t.doneDate=f.doneDate.value;t.sla=+$("slaV").value||0}
   }else{const t={id:uid(),...v,status:"todo"};stampStatus(t,v.status);
-    if(isDone(v.status)&&f.doneDate.value){t.doneDate=f.doneDate.value;t.doneTime=f.doneTime.value||t.doneTime||""}
+    if(isDone(v.status)){if(f.doneDate.value)t.doneDate=f.doneDate.value;t.sla=+$("slaV").value||0}
     tasks.push(t)}
   if(v.date)sel=v.date;save();render();
 };
