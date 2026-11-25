@@ -1400,6 +1400,11 @@ function openForm(t){
 $("new").onclick=()=>openForm();
 $("cancel").onclick=()=>dlg.close();
 $("cancelX").onclick=()=>dlg.close();
+// clic en dehors de la boîte (sur le fond) = fermer ; ignoré si on a commencé le clic à l'intérieur (sélection de texte)
+["dlg","rep","pick"].forEach(id=>{const d=$(id);let down=false;
+  d.addEventListener("mousedown",e=>{down=e.target===d});
+  d.addEventListener("click",e=>{if(down&&e.target===d)d.close();down=false});
+});
 f.onsubmit=e=>{
   if(!f.checkValidity())return;
   const v={date:f.date.value,pdv:f.pdv.value.trim(),task:f.task.value.trim(),comment:f.comment.value.trim(),link:safeUrl(f.link.value.trim()),status:f.status.value,time:f.time.value,urgent:f.urgent.checked,important:f.important.checked,week:false,weekLabel:null,project:f.project.value};
