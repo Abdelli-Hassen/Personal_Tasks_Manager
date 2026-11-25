@@ -380,7 +380,7 @@ header>div:first-child{flex:0 0 100%}
     <label>PDV / contexte<input name="pdv" list="pdvs" required placeholder="ex. Total Gr"></label>
     <label>Situation<select name="status"></select></label>
     <label id="doneDL" hidden>Terminée le<input type="date" name="doneDate"></label>
-    <div class="full" id="slaL"><div class="slalab">Temps passé pour résoudre (SLA) <b id="slaOut"></b></div><input type="hidden" id="slaV"><div class="sla" id="sla"><button type="button" data-m="10">10 min</button><button type="button" data-m="15">15 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="60">1 h</button><button type="button" data-m="120">2 h</button><button type="button" data-m="0">Personnalisé</button></div>
+    <div class="full" id="slaL"><div class="slalab">Temps passé pour résoudre (SLA) <b id="slaOut"></b></div><input type="hidden" id="slaV"><div class="sla" id="sla"><button type="button" data-m="10">10 min</button><button type="button" data-m="15">15 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="45">45 min</button><button type="button" data-m="60">1 h</button><button type="button" data-m="120">2 h</button><button type="button" data-m="0">Personnalisé</button></div>
       <div class="slac" id="slac" hidden><label>Jours<input type="number" id="slaD" min="0" step="1" value="0"></label><label>Heures<input type="number" id="slaH" min="0" step="1" value="1"></label><label>Minutes<input type="number" id="slaM" min="0" step="1" value="0"></label></div></div>
     <label class="full">Tâche<input name="task" required placeholder="Que faut-il faire ?"></label>
     <label class="full">Commentaire<input name="comment" placeholder="optionnel"></label>
@@ -1317,7 +1317,7 @@ const fmtSla=m=>{m=Math.round(+m||0);if(!m)return "";const d=Math.floor(m/1440),
 const slaMark=m=>{$("sla").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===String(m)));$("slac").hidden=m!==0};
 function slaSet(min,mark){
   min=Math.max(0,Math.round(+min||0));$("slaV").value=min||"";$("slaOut").textContent=min?"· "+fmtSla(min):"";
-  if(mark!==false)slaMark(!min?-1:[10,15,30,60,120].includes(min)&&$("slac").hidden?min:0);
+  if(mark!==false)slaMark(!min?-1:[10,15,30,45,60,120].includes(min)&&$("slac").hidden?min:0);
 }
 function syncDone(){
   const d=isDone(f.status.value);
@@ -1338,7 +1338,7 @@ $("sla").onclick=e=>{
 function slaLoad(min){
   min=+min||0;slaSet(min,false);
   if(!min)return slaMark(-1);
-  if([10,15,30,60,120].includes(min))return slaMark(min);
+  if([10,15,30,45,60,120].includes(min))return slaMark(min);
   slaMark(0);$("slaD").value=Math.floor(min/1440);$("slaH").value=Math.floor(min%1440/60);$("slaM").value=min%60;
 }
 function checkLink(){
