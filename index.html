@@ -735,16 +735,8 @@ async function mirror(granted){
 function renderPillOnly(){setFs(fsState,fsMsg)}
 async function pickBackup(){
   try{
-    if(bkHandle&&!bkOk){
-      let g=false;
-      try{g=(await bkHandle.requestPermission({mode:"readwrite"}))==="granted"}catch(e){}
-      if(g){
-        await mirror(true);
-        if(bkOk)return toast("Sauvegarde mise à jour : "+bkHandle.name+"\\"+BK_NAME);
-      }
-    }
-    toast("Chrome refuse « Documents » lui-même : choisissez ou créez un sous-dossier (ex. Suivi-Sauvegarde)");
-    const d=await showDirectoryPicker({id:"suivi-backup",mode:"readwrite",startIn:"documents"});
+    toast(bkHandle?"Re-sélectionnez le dossier de sauvegarde pour l'autoriser":"Chrome refuse « Documents » lui-même : choisissez ou créez un sous-dossier (ex. Suivi-Sauvegarde)");
+    const d=await showDirectoryPicker({id:"suivi-backup",mode:"readwrite",startIn:bkHandle||"documents"});
     bkHandle=d;await kvSet("bk",d);await mirror();
     toast(bkOk?"Sauvegarde créée dans « "+d.name+" »":"Sauvegarde impossible dans ce dossier");
   }catch(e){if(e.name!=="AbortError")toast("Sauvegarde : "+e.message)}
