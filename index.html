@@ -721,11 +721,11 @@ async function loadFromFile(first,keepSel){
 }
 const BK_NAME="Taches-sauvegarde.csv";
 // Copie de secours : crée Taches-sauvegarde.csv dans le dossier choisi s'il n'existe pas, sinon l'écrase avec le contenu à jour.
-async function mirror(){
+async function mirror(granted){
   if(!bkHandle||!handle)return;
   try{
     bkErr=false;
-    if(!await ensurePerm(bkHandle,false)){bkOk=false;return renderPillOnly()}
+    if(!granted&&!await ensurePerm(bkHandle,false)){bkOk=false;return renderPillOnly()}
     const fh=await bkHandle.getFileHandle(BK_NAME,{create:true});
     const w=await fh.createWritable();await w.write(toCsv());await w.close();
     bkOk=true;
@@ -735,7 +735,14 @@ async function mirror(){
 function renderPillOnly(){setFs(fsState,fsMsg)}
 async function pickBackup(){
   try{
-    if(bkHandle&&!bkOk&&await ensurePerm(bkHandle,true)){await mirror();return toast("Sauvegarde mise à jour : "+bkHandle.name+"\\"+BK_NAME)}
+    if(bkHandle&&!bkOk){
+      let g=false;
+      try{g=(await bkHandle.requestPermission({mode:"readwrite"}))==="granted"}catch(e){}
+      if(g){
+        await mirror(true);
+        if(bkOk)return toast("Sauvegarde mise à jour : "+bkHandle.name+"\\"+BK_NAME);
+      }
+    }
     toast("Chrome refuse « Documents » lui-même : choisissez ou créez un sous-dossier (ex. Suivi-Sauvegarde)");
     const d=await showDirectoryPicker({id:"suivi-backup",mode:"readwrite",startIn:"documents"});
     bkHandle=d;await kvSet("bk",d);await mirror();
