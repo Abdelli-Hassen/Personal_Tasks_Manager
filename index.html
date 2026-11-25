@@ -290,6 +290,27 @@ dialog label{font-size:12px;font-weight:650;letter-spacing:.02em;text-transform:
 dialog label input,dialog label select{text-transform:none;letter-spacing:0;font-weight:400;font-size:15px}
 dialog .acts{padding-top:6px}
 dialog .pk,dialog .urgl{text-transform:none;letter-spacing:0;font-weight:500}
+/* ---- formulaire de tâche ---- */
+#dlg{width:min(580px,95vw);overflow:hidden}
+#dlg form{display:flex;flex-direction:column;padding:0;gap:0;max-height:min(92vh,900px)}
+#dlg .tfh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:22px 24px 16px;background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 20%,transparent),transparent 75%);border-bottom:1px solid var(--line)}
+#dlg .tfh h2{margin:0;font-size:22px}
+#dlg .tfh p{margin:3px 0 0;font-size:12.5px;color:var(--mute)}
+#dlg .tfx{border:1px solid var(--line);background:var(--card);border-radius:50%;width:34px;height:34px;cursor:pointer;color:var(--mute);flex:none}
+#dlg .tfx:hover{color:var(--ink);border-color:var(--accent)}
+#dlg .tfb{overflow:auto;padding:18px 24px;display:grid;gap:14px}
+#dlg label{display:grid;gap:5px;font-size:12.5px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--mute)}
+#dlg .big input{font-size:18px;font-weight:600;padding:14px 16px;border-radius:14px}
+#dlg .grp{border:1px solid var(--line);border-radius:16px;padding:14px 16px 16px;display:grid;gap:12px;background:color-mix(in srgb,var(--accent-soft) 22%,transparent)}
+#dlg .gt{font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+#dlg .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#dlg #slaL{border:0;padding:0;background:none}
+#dlg .flags{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#dlg .flags .urgl{padding:12px 14px;font-weight:650!important}
+#dlg .flags .fire{font-size:22px}
+#dlg .acts{padding:14px 24px;border-top:1px solid var(--line);background:var(--card)}
+#dlg .acts .btn{padding:11px 22px}
+@media (max-width:520px){#dlg .row2.stk{grid-template-columns:1fr}#dlg .tfb,#dlg .tfh,#dlg .acts{padding-left:16px;padding-right:16px}}
 dialog.ask{width:min(430px,92vw)}
 .askbox{padding:26px;display:grid;gap:14px}
 .askbox h2{margin:0;font-size:20px;font-weight:800;letter-spacing:-.03em}
@@ -377,23 +398,33 @@ header>div:first-child{flex:0 0 100%}
 
 <dialog id="dlg">
   <form method="dialog" id="form">
-    <h2 id="dlgTitle">Nouvelle tâche</h2>
-    <label>Jour<input type="date" name="date"></label>
-    <label>Heure<input type="time" name="time"></label>
-    <label class="full">Projet<select name="project"></select></label>
-    <label>PDV / contexte<input name="pdv" list="pdvs" required placeholder="ex. Total Gr"></label>
-    <label>Situation<select name="status"></select></label>
-    <label id="doneDL" hidden>Terminée le<input type="date" name="doneDate"></label>
-    <div class="full" id="slaL"><div class="slalab">Temps passé pour résoudre (SLA) <b id="slaOut"></b></div><input type="hidden" id="slaV"><div class="sla" id="sla"><button type="button" data-m="10">10 min</button><button type="button" data-m="15">15 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="45">45 min</button><button type="button" data-m="60">1 h</button><button type="button" data-m="120">2 h</button><button type="button" data-m="0">✎ Personnalisé : jours, heures, minutes</button></div>
+    <header class="tfh"><div><h2 id="dlgTitle">Nouvelle tâche</h2><p>Seuls la tâche et le contexte sont obligatoires</p></div><button type="button" class="tfx" id="cancelX" aria-label="Fermer">✕</button></header>
+    <div class="tfb">
+      <label class="big">Tâche<input name="task" required placeholder="Que faut-il faire ?" autocomplete="off"></label>
+      <section class="grp"><div class="gt">📅 Quand</div>
+        <div class="row2"><label>Jour<input type="date" name="date"></label><label>Heure<input type="time" name="time"></label></div>
+      </section>
+      <section class="grp"><div class="gt">📍 Où</div>
+        <div class="row2 stk"><label>PDV / contexte<input name="pdv" list="pdvs" required placeholder="ex. Total Gr" autocomplete="off"></label><label>Projet<select name="project"></select></label></div>
+      </section>
+      <section class="grp"><div class="gt">✅ Avancement</div>
+        <label>Situation<select name="status"></select></label>
+        <label id="doneDL" hidden>Terminée le<input type="date" name="doneDate"></label>
+        <div id="slaL"><div class="slalab">Temps passé pour résoudre (SLA) <b id="slaOut"></b></div><input type="hidden" id="slaV"><div class="sla" id="sla"><button type="button" data-m="10">10 min</button><button type="button" data-m="15">15 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="45">45 min</button><button type="button" data-m="60">1 h</button><button type="button" data-m="120">2 h</button><button type="button" data-m="0">✎ Personnalisé : jours, heures, minutes</button></div>
       <div class="slac" id="slac" hidden><label>Jours<input type="number" id="slaD" min="0" step="1" value="0"></label><label>Heures<input type="number" id="slaH" min="0" step="1" value="1"></label><label>Minutes<input type="number" id="slaM" min="0" step="1" value="0"></label></div></div>
-    <label class="full">Tâche<input name="task" required placeholder="Que faut-il faire ?"></label>
-    <label class="full">Commentaire<input name="comment" placeholder="optionnel"></label>
-    <label class="full">Lien (e-mail ou fichier)<input name="link" type="url" pattern="https?://\S+" placeholder="Collez le lien d'un e-mail ou d'un fichier  optionnel" title="Un lien commençant par http:// ou https://"></label>
-    <div class="full" id="linkWarn" hidden style="font-size:12px;color:var(--warn,#b45309);margin-top:-6px"></div>
-    <datalist id="pdvs"></datalist>
-    <label class="full urgl impl"><input type="checkbox" name="important"><span class="fire">⭐</span><span class="ut on-t">Importante : mise en avant</span><span class="ut off-t">Pas importante (cliquer pour marquer)</span></label>
-    <label class="full urgl"><input type="checkbox" name="urgent"><span class="fire">🔥</span><span class="ut on-t">Urgente : allumée, en haut de la liste</span><span class="ut off-t">Pas urgente : éteinte (cliquer pour allumer)</span></label>
-    <div class="acts"><button type="button" class="btn" id="cancel">Annuler</button><button class="btn primary" id="ok">Ajouter</button></div>
+      </section>
+      <section class="grp"><div class="gt">📝 Détails</div>
+        <label>Commentaire<input name="comment" placeholder="optionnel"></label>
+        <label>Lien (e-mail ou fichier)<input name="link" type="url" pattern="https?://\S+" placeholder="Collez le lien d'un e-mail ou d'un fichier  optionnel" title="Un lien commençant par http:// ou https://"></label>
+        <div id="linkWarn" hidden style="font-size:12px;color:var(--warn,#b45309);margin-top:-6px"></div>
+      </section>
+      <datalist id="pdvs"></datalist>
+      <div class="flags">
+        <label class="urgl impl"><input type="checkbox" name="important"><span class="fire">⭐</span><span class="ut on-t">Importante</span><span class="ut off-t">Marquer importante</span></label>
+        <label class="urgl"><input type="checkbox" name="urgent"><span class="fire">🔥</span><span class="ut on-t">Urgente</span><span class="ut off-t">Marquer urgente</span></label>
+      </div>
+    </div>
+    <footer class="acts"><button type="button" class="btn" id="cancel">Annuler</button><button class="btn primary" id="ok">Ajouter</button></footer>
   </form>
 </dialog>
 <dialog id="rep">
@@ -1368,6 +1399,7 @@ function openForm(t){
 }
 $("new").onclick=()=>openForm();
 $("cancel").onclick=()=>dlg.close();
+$("cancelX").onclick=()=>dlg.close();
 f.onsubmit=e=>{
   if(!f.checkValidity())return;
   const v={date:f.date.value,pdv:f.pdv.value.trim(),task:f.task.value.trim(),comment:f.comment.value.trim(),link:safeUrl(f.link.value.trim()),status:f.status.value,time:f.time.value,urgent:f.urgent.checked,important:f.important.checked,week:false,weekLabel:null,project:f.project.value};
