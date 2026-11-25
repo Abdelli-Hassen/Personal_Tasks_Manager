@@ -150,14 +150,18 @@ dialog h2{grid-column:1/-1;margin:0;font-size:19px}
 dialog label{display:grid;gap:4px;font-size:12.5px;color:var(--mute)}
 dialog .full{grid-column:1/-1}
 dialog [hidden]{display:none!important}
-.slalab b{color:var(--accent);text-transform:none;letter-spacing:0;font-size:13px;margin-left:6px}
-.slalab{font-size:12px;font-weight:650;letter-spacing:.02em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
-.slac{display:flex;gap:8px;margin-top:8px}.slac label{flex:1}.slac input{width:100%}
-.sla{display:flex;flex-wrap:wrap;gap:6px}
-.sla button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:7px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
-.sla button:hover{border-color:var(--accent)}
-.sla button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
-@media (prefers-color-scheme:dark){.sla button.on{color:#0c101c}}
+#slaL{border:1px solid var(--line);border-radius:16px;padding:14px;background:color-mix(in srgb,var(--accent-soft) 35%,transparent)}
+.slalab{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;font-weight:650;letter-spacing:.02em;text-transform:uppercase;color:var(--mute);margin-bottom:10px}
+.slalab b{background:var(--accent);color:#fff;border-radius:99px;padding:3px 11px;font-size:12px;letter-spacing:0;text-transform:none}
+.slalab b:empty{display:none}
+.sla{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.sla button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;padding:10px 0;font:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:.12s}
+.sla button[data-m="0"]{grid-column:1/-1;border-style:dashed;font-weight:600;color:var(--mute)}
+.sla button:hover{border-color:var(--accent);transform:translateY(-1px)}
+.sla button.on{background:var(--accent);color:#fff;border:1px solid var(--accent);box-shadow:0 4px 12px rgba(79,70,229,.35)}
+.slac{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.slac label{flex:none}.slac input{width:100%}
+@media (prefers-color-scheme:dark){.sla button.on,.slalab b{color:#0c101c}}
 dialog .acts{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
 
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;display:flex;gap:14px;align-items:center;box-shadow:0 8px 30px rgba(0,0,0,.3);z-index:9}
@@ -380,7 +384,7 @@ header>div:first-child{flex:0 0 100%}
     <label>PDV / contexte<input name="pdv" list="pdvs" required placeholder="ex. Total Gr"></label>
     <label>Situation<select name="status"></select></label>
     <label id="doneDL" hidden>Terminée le<input type="date" name="doneDate"></label>
-    <div class="full" id="slaL"><div class="slalab">Temps passé pour résoudre (SLA) <b id="slaOut"></b></div><input type="hidden" id="slaV"><div class="sla" id="sla"><button type="button" data-m="10">10 min</button><button type="button" data-m="15">15 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="45">45 min</button><button type="button" data-m="60">1 h</button><button type="button" data-m="120">2 h</button><button type="button" data-m="0">Personnalisé</button></div>
+    <div class="full" id="slaL"><div class="slalab">Temps passé pour résoudre (SLA) <b id="slaOut"></b></div><input type="hidden" id="slaV"><div class="sla" id="sla"><button type="button" data-m="10">10 min</button><button type="button" data-m="15">15 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="45">45 min</button><button type="button" data-m="60">1 h</button><button type="button" data-m="120">2 h</button><button type="button" data-m="0">✎ Personnalisé : jours, heures, minutes</button></div>
       <div class="slac" id="slac" hidden><label>Jours<input type="number" id="slaD" min="0" step="1" value="0"></label><label>Heures<input type="number" id="slaH" min="0" step="1" value="1"></label><label>Minutes<input type="number" id="slaM" min="0" step="1" value="0"></label></div></div>
     <label class="full">Tâche<input name="task" required placeholder="Que faut-il faire ?"></label>
     <label class="full">Commentaire<input name="comment" placeholder="optionnel"></label>
