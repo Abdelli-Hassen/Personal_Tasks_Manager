@@ -416,7 +416,7 @@ header>div:first-child{flex:0 0 100%}
         <label id="doneDL" hidden>Terminée le<input type="date" name="doneDate"></label>
         <div id="slaL"><div class="slalab">Temps passé pour résoudre (SLA) <b id="slaOut"></b></div><input type="hidden" id="slaV"><div class="sla" id="sla"><button type="button" data-m="10">10 min</button><button type="button" data-m="15">15 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="45">45 min</button><button type="button" data-m="60">1 h</button><button type="button" data-m="120">2 h</button><button type="button" data-m="0">✎ Personnalisé : jours, heures, minutes</button></div>
       <div class="slac" id="slac" hidden><label>Jours<input type="number" id="slaD" min="0" step="1" value="0"></label><label>Heures<input type="number" id="slaH" min="0" step="1" value="1"></label><label>Minutes<input type="number" id="slaM" min="0" step="1" value="0"></label></div>
-        <label class="chkl"><input type="checkbox" name="showDates">Afficher les dates de début et de fin</label></div>
+        <label class="chkl"><input type="checkbox" name="showDates">Afficher les dates (et la tâche aussi au jour de fin)</label></div>
       </section>
       <section class="grp"><div class="gt">📝 Détails</div>
         <label>Commentaire<input name="comment" placeholder="optionnel"></label>
@@ -1061,7 +1061,8 @@ function labelEnd(l){const m=(l||"").match(/->\s*(\d{2})\/(\d{2})\/(\d{2})/);ret
 // une tâche "semaine seulement" couvre toute la plage de sa semaine d'origine
 const range=t=>{const a=t.week&&labelStart(t.weekLabel),b=a&&labelEnd(t.weekLabel);return a&&b?[a,b]:[t.date,t.date]};
 // une tâche terminée un autre jour apparaît aussi le jour où elle a été terminée
-const doneOn=t=>isDone(t.status)&&t.doneDate||null;
+// jour de fin pris en compte (listes, barre des jours, rapports) seulement si la case « Afficher les dates » est cochée
+const doneOn=t=>t.showDates&&isDone(t.status)&&t.doneDate||null;
 const inScope=t=>{
   if(scope==="all")return true;
   const d=doneOn(t);
