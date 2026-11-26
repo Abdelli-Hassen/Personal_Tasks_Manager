@@ -305,6 +305,8 @@ dialog .pk,dialog .urgl{text-transform:none;letter-spacing:0;font-weight:500}
 #dlg .gt{font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
 #dlg .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 #dlg #slaL{border:0;padding:0;background:none}
+#dlg .chkl{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;color:var(--ink);cursor:pointer}
+#dlg .chkl input{width:18px;height:18px;margin:0;flex:none;accent-color:var(--accent)}
 #dlg .flags{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 #dlg .flags .urgl{padding:12px 14px;font-weight:650!important}
 #dlg .flags .fire{font-size:22px}
@@ -413,7 +415,8 @@ header>div:first-child{flex:0 0 100%}
         <label>Situation<select name="status"></select></label>
         <label id="doneDL" hidden>Terminée le<input type="date" name="doneDate"></label>
         <div id="slaL"><div class="slalab">Temps passé pour résoudre (SLA) <b id="slaOut"></b></div><input type="hidden" id="slaV"><div class="sla" id="sla"><button type="button" data-m="10">10 min</button><button type="button" data-m="15">15 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="45">45 min</button><button type="button" data-m="60">1 h</button><button type="button" data-m="120">2 h</button><button type="button" data-m="0">✎ Personnalisé : jours, heures, minutes</button></div>
-      <div class="slac" id="slac" hidden><label>Jours<input type="number" id="slaD" min="0" step="1" value="0"></label><label>Heures<input type="number" id="slaH" min="0" step="1" value="1"></label><label>Minutes<input type="number" id="slaM" min="0" step="1" value="0"></label></div></div>
+      <div class="slac" id="slac" hidden><label>Jours<input type="number" id="slaD" min="0" step="1" value="0"></label><label>Heures<input type="number" id="slaH" min="0" step="1" value="1"></label><label>Minutes<input type="number" id="slaM" min="0" step="1" value="0"></label></div>
+        <label class="chkl"><input type="checkbox" name="showDates">Afficher les dates de début et de fin</label></div>
       </section>
       <section class="grp"><div class="gt">📝 Détails</div>
         <label>Commentaire<input name="comment" placeholder="optionnel"></label>
@@ -565,7 +568,7 @@ function cleanPdvs(){
 }
 
 /* ---------- CSV <-> tâches ---------- */
-const HEADER=["Week-date","PDV","Tache","Situation","commentaire","Date","Heure","Urgent","Fait le","Heure fin","Depuis","Projet","Lien","Important","SLA (min)"];
+const HEADER=["Week-date","PDV","Tache","Situation","commentaire","Date","Heure","Urgent","Fait le","Heure fin","Depuis","Projet","Lien","Important","SLA (min)","Afficher dates"];
 const NODAY="Sans jour (projets)";
 const isUrg=t=>t.urgent&&!isDone(t.status);
 const isImp=t=>t.important&&!isDone(t.status);
@@ -600,14 +603,14 @@ function fromCsv(text){
   const sep=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?";":",";
   const out=[],projs=[];let label=null,start=null;
   parseCsv(text,sep).forEach((r,i)=>{
-    const [a,pdv,task,st,cm,dcol,tcol,ucol,fdate,ftime,from,proj,lien,impc,slac]=r.map(x=>(x||"").trim());
+    const [a,pdv,task,st,cm,dcol,tcol,ucol,fdate,ftime,from,proj,lien,impc,slac,showc]=r.map(x=>(x||"").trim());
     if(a==="#PROJET"){projs.push({name:pdv,done:norm(st)==="termine",doneDate:parseDate(fdate)||"",urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||"")});return}
     if(i===0&&norm(task)==="tache")return;
     if(a&&!pdv&&!task){label=a;start=labelStart(a);return}
     if(!pdv&&!task)return;
     const d=parseDate(dcol)||parseDate(a);
     const nod=!d&&label===NODAY;
-    out.push({id:uid(),project:proj||"",link:safeUrl(lien),date:d||(nod?"":start||todayIso),week:!d&&!nod,weekLabel:d||nod?null:label,pdv,task,status:BYLABEL[norm(st)]||"todo",comment:cm||"",time:parseTime(tcol),urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||""),important:/^(oui|yes|1|x|true|important)$/i.test(impc||""),doneDate:isDone(BYLABEL[norm(st)]||"todo")?parseDate(fdate):null,doneTime:parseTime(ftime),sla:isDone(BYLABEL[norm(st)]||"todo")?+slac||0:0,from:parseDate(from)});
+    out.push({id:uid(),project:proj||"",link:safeUrl(lien),date:d||(nod?"":start||todayIso),week:!d&&!nod,weekLabel:d||nod?null:label,pdv,task,status:BYLABEL[norm(st)]||"todo",comment:cm||"",time:parseTime(tcol),urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||""),important:/^(oui|yes|1|x|true|important)$/i.test(impc||""),doneDate:isDone(BYLABEL[norm(st)]||"todo")?parseDate(fdate):null,doneTime:parseTime(ftime),sla:isDone(BYLABEL[norm(st)]||"todo")?+slac||0:0,showDates:/^(oui|yes|1|x|true)$/i.test(showc||""),from:parseDate(from)});
   });
   fromCsv.projects=projs;
   return out;
@@ -621,10 +624,10 @@ function toCsv(){
   });
   const key=l=>labelStart(l)||"9999";
   const rows=[HEADER];
-  projects.forEach(p=>rows.push(["#PROJET",p.name,"",p.done?"Terminé":"","","","",p.urgent?"Oui":"",p.done&&p.doneDate||"","","","","","",""]));
+  projects.forEach(p=>rows.push(["#PROJET",p.name,"",p.done?"Terminé":"","","","",p.urgent?"Oui":"",p.done&&p.doneDate||"","","","","","","",""]));
   [...groups.entries()].sort((x,y)=>key(x[0]).localeCompare(key(y[0]))).forEach(([label,list])=>{
-    rows.push([label,"","","","","","","","","","","","","",""]);
-    [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":"",isDone(t.status)&&t.doneDate||"",isDone(t.status)&&t.doneDate&&t.doneTime||"",t.from||"",t.project||"",t.link||"",t.important?"Oui":"",isDone(t.status)&&t.sla||""]));
+    rows.push([label,"","","","","","","","","","","","","","",""]);
+    [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":"",isDone(t.status)&&t.doneDate||"",isDone(t.status)&&t.doneDate&&t.doneTime||"",t.from||"",t.project||"",t.link||"",t.important?"Oui":"",isDone(t.status)&&t.sla||"",t.showDates?"Oui":""]));
   });
   return "﻿"+rows.map(r=>r.map(cell).join(";")).join("\r\n")+"\r\n";
 }
@@ -1122,9 +1125,10 @@ function renderControls(){
   $("pdvSel").innerHTML=`<option value="">Tous les PDV</option>`+pdvs.map(p=>`<option${p===pdvF?" selected":""}>${esc(p)}</option>`).join("");
   $("pdvs").innerHTML=pdvs.map(p=>`<option value="${esc(p)}">`).join("");
 }
-// période : début (jour de la tâche, ou jour d'origine si reportée) -> fin (jour + heure du clic sur Terminé)
+// période : début (jour de la tâche, ou jour d'origine si reportée) -> fin ; les dates ne s'affichent que si la case est cochée
 function period(t){
   if(!isDone(t.status)||!t.doneDate)return "";
+  if(!t.showDates)return t.sla?"⏱ "+fmtSla(t.sla):"";
   const d=s=>fmt(s,{weekday:"short",day:"numeric",month:"short"}),at=t.sla?" · ⏱ "+fmtSla(t.sla):"";
   const a=t.week?null:(t.from||t.date);
   if(!a||a===t.doneDate)return `Fini le ${d(t.doneDate)}${at}`;
@@ -1391,7 +1395,7 @@ function openForm(t){
   f.project.innerHTML=`<option value="">Aucun</option>`+projects.map(p=>`<option>${esc(p.name)}</option>`).join("");
   f.project.value=t?(t.project||""):(inP&&openProj||"");syncReq();
   f.date.value=t?t.date:(inP||scope==="all"?todayIso:sel);f.pdv.value=t?t.pdv:(inP?"":pdvF);f.task.value=t?t.task:"";
-  f.comment.value=t?t.comment:"";f.link.value=t?(t.link||""):"";f.status.value=t?t.status:"todo";f.urgent.checked=!!(t&&t.urgent);f.important.checked=t?!!t.important:(view==="importance"&&!openProj);
+  f.comment.value=t?t.comment:"";f.link.value=t?(t.link||""):"";f.status.value=t?t.status:"todo";f.urgent.checked=!!(t&&t.urgent);f.important.checked=t?!!t.important:(view==="importance"&&!openProj);f.showDates.checked=!!(t&&t.showDates);
   f.time.value=t?(t.time||""):new Date().toTimeString().slice(0,5);
   timeTouched=!!t;checkLink();
   f.doneDate.value=t&&isDone(t.status)?(t.doneDate||""):"";slaLoad(t&&isDone(t.status)?t.sla:0);
@@ -1408,7 +1412,7 @@ $("cancelX").onclick=()=>dlg.close();
 });
 f.onsubmit=e=>{
   if(!f.checkValidity())return;
-  const v={date:f.date.value,pdv:f.pdv.value.trim(),task:f.task.value.trim(),comment:f.comment.value.trim(),link:safeUrl(f.link.value.trim()),status:f.status.value,time:f.time.value,urgent:f.urgent.checked,important:f.important.checked,week:false,weekLabel:null,project:f.project.value};
+  const v={date:f.date.value,pdv:f.pdv.value.trim(),task:f.task.value.trim(),comment:f.comment.value.trim(),link:safeUrl(f.link.value.trim()),status:f.status.value,time:f.time.value,urgent:f.urgent.checked,important:f.important.checked,showDates:f.showDates.checked,week:false,weekLabel:null,project:f.project.value};
   if(!v.date)v.from=(editId&&(find(editId).from||find(editId).date))||todayIso;
   // heure laissée telle quelle = l'heure de l'enregistrement, pas celle de l'ouverture du formulaire
   if(!editId&&!timeTouched)v.time=new Date().toTimeString().slice(0,5);
