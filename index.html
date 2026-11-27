@@ -89,6 +89,7 @@ h1{font-size:26px;margin:0;letter-spacing:-.03em}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
 .chip{padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-size:13px;color:var(--mute)}
 .chip.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.chip.old{margin-left:auto}
 
 /* list */
 .group{margin-bottom:22px}
@@ -548,9 +549,9 @@ if(!Array.isArray(projects))projects=[];
 let view="days",openProj=null,impF="none",impD="all",impRef=todayIso;
 // vrai quand on regarde le détail d'un projet (page Projets, ou page Importance avec un projet ouvert)
 const inProj=()=>view==="projects"||(view==="importance"&&!!openProj);
-let sel=todayIso,scope="day",mode="list",statusF=new Set(),pdvF="",q="",qf="pdv",editId=null;
-try{const p=JSON.parse(localStorage.getItem("suivi-prefs")||"{}");scope=p.scope||scope;mode=p.mode||mode;qf=p.qf||qf;if(p.theme)document.documentElement.dataset.theme=p.theme}catch(e){}
-const savePrefs=()=>{try{localStorage.setItem("suivi-prefs",JSON.stringify({scope,mode,qf,theme:document.documentElement.dataset.theme}))}catch(e){}};
+let sel=todayIso,scope="day",mode="list",statusF=new Set(),pdvF="",q="",qf="pdv",editId=null,hideOld=false;
+try{const p=JSON.parse(localStorage.getItem("suivi-prefs")||"{}");scope=p.scope||scope;mode=p.mode||mode;qf=p.qf||qf;hideOld=!!p.hideOld;if(p.theme)document.documentElement.dataset.theme=p.theme}catch(e){}
+const savePrefs=()=>{try{localStorage.setItem("suivi-prefs",JSON.stringify({scope,mode,qf,hideOld,theme:document.documentElement.dataset.theme}))}catch(e){}};
 
 /* ---------- noms de PDV : "lac" / "LAC" / "Lac" => une seule graphie ---------- */
 const pkey=s=>norm(s).replace(/\s+/g," ");
@@ -1071,9 +1072,17 @@ const inDays=(t,lo,hi)=>{
   const [a,b]=span(t);
   return (a<=hi&&b>=lo)||[t.date,doneOn(t),...(t.worked||[])].some(d=>d&&d>=lo&&d<=hi);
 };
+// « Masquer les anciennes » : on ne garde que les tâches propres à la période (prévues, terminées ou travaillées)
+const ownDays=(t,lo,hi)=>{
+  const [a,b]=range(t);
+  return (t.week&&lo!==hi&&a<=hi&&b>=lo)||[t.date,doneOn(t),...(t.worked||[])].some(d=>d&&d>=lo&&d<=hi);
+};
+const onScreen=(t,lo,hi)=>hideOld?ownDays(t,lo,hi):inDays(t,lo,hi);
+const shownRange=()=>scope==="day"?[sel,sel]:weekRange(sel);
+const isOld=t=>t.date&&inDays(t,...shownRange())&&!ownDays(t,...shownRange());
 const inScope=t=>{
   if(scope==="all")return true;
-  return scope==="day"?inDays(t,sel,sel):inDays(t,...weekRange(sel));
+  return onScreen(t,...shownRange());
 };
 let urgF=false;
 // filtre Urgentes : toutes les urgentes encore « À faire » ou « En cours », tous jours confondus
@@ -1113,12 +1122,18 @@ function renderHero(items){
 function renderStrip(){
   const [ws,we]=weekRange(sel);let h=`<button class="btn navb" data-w="-1">‹</button><div class="days">`;
   for(let s=ws;s<=we;s=addDays(s,1)){
-    const list=tasks.filter(t=>t.date&&inDays(t,s,s)),d=list.filter(t=>isDone(t.status)).length;
+    const list=tasks.filter(t=>t.date&&onScreen(t,s,s)),d=list.filter(t=>isDone(t.status)).length;
     h+=`<div class="day${s===sel&&scope!=="all"?" sel":""}${s===todayIso?" today":""}" data-d="${s}">
       <small>${DAYS[parse(s).getDay()]}</small><strong>${parse(s).getDate()}</strong>
       <em>${list.length?d+"/"+list.length:"–"}</em><i><u style="width:${list.length?d/list.length*100:0}%"></u></i></div>`;
   }
   $("strip").innerHTML=h+`</div><button class="btn navb" data-w="1">›</button>`;
+}
+// inutile en vue « Tout », en recherche ou avec le filtre Urgentes, qui montrent tous les jours
+function oldChip(){
+  if(scope==="all"||urgF||q.trim())return "";
+  const n=tasks.filter(t=>isOld(t)&&matchPdv(t)).length;
+  return `<span class="chip old${hideOld?" on":""}" data-old role="button" aria-pressed="${hideOld}">${hideOld?"👁 Afficher":"🙈 Masquer"} les anciennes (${n})</span>`;
 }
 function renderControls(){
   $("scope").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===scope));
@@ -1126,7 +1141,7 @@ function renderControls(){
   $("qf").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===qf));
   $("chips").innerHTML=[["all","Toutes"],["todo","À faire"],["wip","En cours"],["conf","Confirmé"],["fin","Terminé"]]
     .map(([k,l])=>`<span class="chip${isOn(k)?" on":""}" data-s="${k}">${l}</span>`).join("")+
-    `<span class="chip${urgF?" on":""}" data-u>🔥 Urgentes (${tasks.filter(isUrgOpen).length})</span>`;
+    `<span class="chip${urgF?" on":""}" data-u>🔥 Urgentes (${tasks.filter(isUrgOpen).length})</span>`+oldChip();
   const pdvs=[...new Set(Object.values(canonMap()))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
   $("pdvSel").innerHTML=`<option value="">Tous les PDV</option>`+pdvs.map(p=>`<option${p===pdvF?" selected":""}>${esc(p)}</option>`).join("");
   $("pdvs").innerHTML=pdvs.map(p=>`<option value="${esc(p)}">`).join("");
@@ -1470,6 +1485,7 @@ $("todayBtn").onclick=()=>{urgF=false;sel=todayIso;if(scope==="all")scope="day";
 $("scope").onclick=e=>{const b=e.target.closest("button");if(b){urgF=false;scope=b.dataset.v;savePrefs();render()}};
 $("mode").onclick=e=>{const b=e.target.closest("button");if(b){mode=b.dataset.v;savePrefs();render()}};
 const pickStatus=e=>{
+  if(e.target.closest("[data-old]")){hideOld=!hideOld;savePrefs();render();return}
   if(e.target.closest("[data-u]")){urgF=!urgF;render();return}
   const s=e.target.closest("[data-s]");if(!s)return;
   const k=s.dataset.s;
