@@ -344,6 +344,10 @@ a.icon.mail:hover{background:var(--accent-soft);color:var(--accent)}
 .stat{min-height:64px}
 .icon{font-size:20px;min-width:42px;height:42px;padding:0;border-radius:12px;display:inline-grid;place-items:center}
 .icon.fire,.fire.icon{font-size:22px}
+.icon.work{filter:grayscale(1);opacity:.4}
+.icon.work:hover{opacity:.8}
+.icon.work.lit{filter:none;opacity:1;background:color-mix(in srgb,var(--accent) 28%,transparent);box-shadow:inset 0 0 0 2px var(--accent)}
+.wkd{display:block;font-size:12.5px;font-weight:600;color:var(--accent);margin-top:2px}
 .right{gap:6px}
 .badge{padding:8px 16px;font-size:14px}
 .chk{width:30px;height:30px;font-size:16px}
@@ -498,7 +502,7 @@ const iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
 const parse=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
 const fmt=(s,o)=>parse(s).toLocaleDateString("fr-FR",o);
 const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+n);return iso(d)};
-const todayIso=iso(new Date());
+let todayIso=iso(new Date());
 const uid=()=>Math.random().toString(36).slice(2,10);
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -568,7 +572,7 @@ function cleanPdvs(){
 }
 
 /* ---------- CSV <-> tâches ---------- */
-const HEADER=["Week-date","PDV","Tache","Situation","commentaire","Date","Heure","Urgent","Fait le","Heure fin","Depuis","Projet","Lien","Important","SLA (min)","Afficher dates"];
+const HEADER=["Week-date","PDV","Tache","Situation","commentaire","Date","Heure","Urgent","Fait le","Heure fin","Depuis","Projet","Lien","Important","SLA (min)","Afficher dates","Jours travaillés"];
 const NODAY="Sans jour (projets)";
 const isUrg=t=>t.urgent&&!isDone(t.status);
 const isImp=t=>t.important&&!isDone(t.status);
@@ -603,14 +607,14 @@ function fromCsv(text){
   const sep=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?";":",";
   const out=[],projs=[];let label=null,start=null;
   parseCsv(text,sep).forEach((r,i)=>{
-    const [a,pdv,task,st,cm,dcol,tcol,ucol,fdate,ftime,from,proj,lien,impc,slac,showc]=r.map(x=>(x||"").trim());
+    const [a,pdv,task,st,cm,dcol,tcol,ucol,fdate,ftime,from,proj,lien,impc,slac,showc,workc]=r.map(x=>(x||"").trim());
     if(a==="#PROJET"){projs.push({name:pdv,done:norm(st)==="termine",doneDate:parseDate(fdate)||"",urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||"")});return}
     if(i===0&&norm(task)==="tache")return;
     if(a&&!pdv&&!task){label=a;start=labelStart(a);return}
     if(!pdv&&!task)return;
     const d=parseDate(dcol)||parseDate(a);
     const nod=!d&&label===NODAY;
-    out.push({id:uid(),project:proj||"",link:safeUrl(lien),date:d||(nod?"":start||todayIso),week:!d&&!nod,weekLabel:d||nod?null:label,pdv,task,status:BYLABEL[norm(st)]||"todo",comment:cm||"",time:parseTime(tcol),urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||""),important:/^(oui|yes|1|x|true|important)$/i.test(impc||""),doneDate:isDone(BYLABEL[norm(st)]||"todo")?parseDate(fdate):null,doneTime:parseTime(ftime),sla:isDone(BYLABEL[norm(st)]||"todo")?+slac||0:0,showDates:/^(oui|yes|1|x|true)$/i.test(showc||""),from:parseDate(from)});
+    out.push({id:uid(),project:proj||"",link:safeUrl(lien),date:d||(nod?"":start||todayIso),week:!d&&!nod,weekLabel:d||nod?null:label,pdv,task,status:BYLABEL[norm(st)]||"todo",comment:cm||"",time:parseTime(tcol),urgent:/^(oui|yes|1|x|true|urgent)$/i.test(ucol||""),important:/^(oui|yes|1|x|true|important)$/i.test(impc||""),doneDate:isDone(BYLABEL[norm(st)]||"todo")?parseDate(fdate):null,doneTime:parseTime(ftime),sla:isDone(BYLABEL[norm(st)]||"todo")?+slac||0:0,showDates:/^(oui|yes|1|x|true)$/i.test(showc||""),worked:(workc||"").split(/\s+/).map(parseDate).filter(Boolean),from:parseDate(from)});
   });
   fromCsv.projects=projs;
   return out;
@@ -624,10 +628,10 @@ function toCsv(){
   });
   const key=l=>labelStart(l)||"9999";
   const rows=[HEADER];
-  projects.forEach(p=>rows.push(["#PROJET",p.name,"",p.done?"Terminé":"","","","",p.urgent?"Oui":"",p.done&&p.doneDate||"","","","","","","",""]));
+  projects.forEach(p=>rows.push(["#PROJET",p.name,"",p.done?"Terminé":"","","","",p.urgent?"Oui":"",p.done&&p.doneDate||"","","","","","","","",""]));
   [...groups.entries()].sort((x,y)=>key(x[0]).localeCompare(key(y[0]))).forEach(([label,list])=>{
-    rows.push([label,"","","","","","","","","","","","","","",""]);
-    [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":"",isDone(t.status)&&t.doneDate||"",isDone(t.status)&&t.doneDate&&t.doneTime||"",t.from||"",t.project||"",t.link||"",t.important?"Oui":"",isDone(t.status)&&t.sla||"",t.showDates?"Oui":""]));
+    rows.push([label,"","","","","","","","","","","","","","","",""]);
+    [...list].sort((x,y)=>x.date.localeCompare(y.date)||byTime(x,y)).forEach(t=>rows.push(["",t.pdv,t.task,STATUS[t.status].label,t.comment,t.week?"":t.date,t.time||"",t.urgent?"Oui":"",isDone(t.status)&&t.doneDate||"",isDone(t.status)&&t.doneDate&&t.doneTime||"",t.from||"",t.project||"",t.link||"",t.important?"Oui":"",isDone(t.status)&&t.sla||"",t.showDates?"Oui":"",(t.worked||[]).join(" ")]));
   });
   return "﻿"+rows.map(r=>r.map(cell).join(";")).join("\r\n")+"\r\n";
 }
@@ -817,13 +821,7 @@ function repLabel(kind,lo,hi){
 }
 // Tâches liées à la période : prévues dans la période, ou terminées dans la période (comme la vue du jour).
 // Les tâches « semaine seulement » (jour inconnu) ne comptent pas pour un jour précis.
-const repTasks=(lo,hi)=>tasks.filter(t=>{
-  if(!t.date)return false;
-  const d=doneOn(t);
-  if(d&&d>=lo&&d<=hi)return true;
-  if(t.week){const [a,b]=range(t);return lo!==hi&&a<=hi&&b>=lo}
-  return t.date>=lo&&t.date<=hi;
-}).sort((a,b)=>a.date.localeCompare(b.date)||byTime(a,b));
+const repTasks=(lo,hi)=>tasks.filter(t=>t.date&&inDays(t,lo,hi)).sort((a,b)=>a.date.localeCompare(b.date)||byTime(a,b));
 function repCount(l){
   const c=k=>l.filter(t=>k==="fin"?isDone(t.status):t.status===k).length,fin=c("fin");
   return {n:l.length,fin,wip:c("wip"),conf:c("conf"),todo:c("todo"),rate:l.length?fin/l.length:0};
@@ -1060,14 +1058,22 @@ $("pillBtn2").onclick=async()=>{
 function labelEnd(l){const m=(l||"").match(/->\s*(\d{2})\/(\d{2})\/(\d{2})/);return m?`20${m[1]}-${m[2]}-${m[3]}`:null}
 // une tâche "semaine seulement" couvre toute la plage de sa semaine d'origine
 const range=t=>{const a=t.week&&labelStart(t.weekLabel),b=a&&labelEnd(t.weekLabel);return a&&b?[a,b]:[t.date,t.date]};
-// une tâche terminée un autre jour apparaît aussi le jour où elle a été terminée
 const doneOn=t=>isDone(t.status)&&t.doneDate||null;
+// une tâche apparaît chaque jour depuis son début : jusqu'à aujourd'hui tant qu'elle est ouverte, sinon jusqu'au jour de fin
+const span=t=>{
+  const [a,b]=range(t),start=!t.week&&t.from||a;
+  const end=isDone(t.status)?doneOn(t)||b:b>todayIso?b:todayIso;
+  return [start,end];
+};
+const startDay=t=>t.date?span(t)[0]:t.from||"";
+// visible entre lo et hi : période de la tâche, son jour, son jour de fin ou un jour marqué « travaillé »
+const inDays=(t,lo,hi)=>{
+  const [a,b]=span(t);
+  return (a<=hi&&b>=lo)||[t.date,doneOn(t),...(t.worked||[])].some(d=>d&&d>=lo&&d<=hi);
+};
 const inScope=t=>{
   if(scope==="all")return true;
-  const d=doneOn(t);
-  if(scope==="day")return t.date===sel||d===sel;
-  const [lo,hi]=weekRange(sel),[a,b]=range(t);
-  return (a<=hi&&b>=lo)||(d&&d>=lo&&d<=hi);
+  return scope==="day"?inDays(t,sel,sel):inDays(t,...weekRange(sel));
 };
 let urgF=false;
 // filtre Urgentes : toutes les urgentes encore « À faire » ou « En cours », tous jours confondus
@@ -1107,7 +1113,7 @@ function renderHero(items){
 function renderStrip(){
   const [ws,we]=weekRange(sel);let h=`<button class="btn navb" data-w="-1">‹</button><div class="days">`;
   for(let s=ws;s<=we;s=addDays(s,1)){
-    const list=tasks.filter(t=>t.date===s||doneOn(t)===s),d=list.filter(t=>isDone(t.status)).length;
+    const list=tasks.filter(t=>t.date&&inDays(t,s,s)),d=list.filter(t=>isDone(t.status)).length;
     h+=`<div class="day${s===sel&&scope!=="all"?" sel":""}${s===todayIso?" today":""}" data-d="${s}">
       <small>${DAYS[parse(s).getDay()]}</small><strong>${parse(s).getDate()}</strong>
       <em>${list.length?d+"/"+list.length:"–"}</em><i><u style="width:${list.length?d/list.length*100:0}%"></u></i></div>`;
@@ -1137,15 +1143,27 @@ function period(t){
 }
 const projTag=t=>inProj()?`<span class="dj">${t.date?fmt(t.date,{day:"numeric",month:"short"}):"sans jour"}</span>`:(t.project?`<span class="prj">📁 ${esc(t.project)}</span>`:"");
 const pdvTag=t=>!t.pdv?"":`<span class="pdv" style="--h:${hue(t.pdv)}">${esc(t.pdv)}</span>`;
+// jour concerné par le bouton 🛠 : le jour affiché en vue Jour, sinon aujourd'hui
+const dayView=()=>scope==="day"&&!q.trim()&&!urgF;
+const workDay=()=>view==="days"&&dayView()?sel:todayIso;
+// pas de 🛠 avant le début de la tâche, dans le futur, ni après sa fin
+const canWork=(t,d)=>d<=todayIso&&d>=startDay(t)&&!(doneOn(t)&&d>doneOn(t));
+function workBtn(t){
+  const d=workDay(),on=(t.worked||[]).includes(d),n=(t.worked||[]).length;
+  if(!on&&!canWork(t,d))return "";
+  const j=fmt(d,{weekday:"long",day:"numeric",month:"long"});
+  return `<button class="icon work${on?" lit":""}" data-act="work" aria-pressed="${on}" title="${on?`Travaillé le ${j} : cliquer pour retirer`:`J'ai travaillé dessus le ${j}`}${n?` (${n} jour(s) travaillé(s))`:""}">🛠</button>`;
+}
 function taskHtml(t){
-  const s=STATUS[t.status];
+  const s=STATUS[t.status],worked=(t.worked||[]).includes(workDay());
   return `<div class="task st-${t.status}${isDone(t.status)?" done":""}${isUrg(t)?" urgent":""}${isImp(t)?" imp":""}" data-id="${t.id}">
     <button class="chk" data-act="tick" title="Terminer / rouvrir">✓</button>
-    <div class="t" data-act="edit">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${isImp(t)?`<span class="ib">⭐ IMPORTANT</span>`:""}${t.date&&t.time?`<span class="tm">${t.time}</span>`:""}${projTag(t)}${pdvTag(t)}${esc(t.task)}${t.week?`<span class="wk" title="Seule la semaine est connue. Modifiez la tâche pour fixer le jour.">jour ?</span>`:""}${t.comment?`<span class="c">${esc(t.comment)}</span>`:""}${period(t)?`<span class="per">✓ ${period(t)}</span>`:""}</div>
+    <div class="t" data-act="edit">${isUrg(t)?`<span class="ub">URGENT</span>`:""}${isImp(t)?`<span class="ib">⭐ IMPORTANT</span>`:""}${t.date&&t.time?`<span class="tm">${t.time}</span>`:""}${projTag(t)}${pdvTag(t)}${esc(t.task)}${t.week?`<span class="wk" title="Seule la semaine est connue. Modifiez la tâche pour fixer le jour.">jour ?</span>`:""}${t.comment?`<span class="c">${esc(t.comment)}</span>`:""}${period(t)?`<span class="per">✓ ${period(t)}</span>`:""}${worked?`<span class="wkd">🛠 Travaillé ${workDay()===todayIso?"aujourd'hui":"ce jour"}</span>`:""}</div>
     <div class="right">
       <select class="badge ${s.cls}" data-act="st">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}"${k===t.status?" selected":""}>${v.label}</option>`).join("")}</select>
       ${safeUrl(t.link)?`<a class="icon mail" href="${esc(t.link)}" target="_blank" rel="noopener noreferrer" title="Ouvrir le lien">${linkIcon(t.link)}</a>`:""}
       ${safeUrl(t.link)&&mailKind(t.link)?`<button class="icon" data-act="msearch" title="Le lien ne s'ouvre plus ? Chercher cet e-mail (par le commentaire, sinon la tâche)">🔎</button>`:""}
+      ${workBtn(t)}
       <button class="icon star${t.important?" lit":""}" data-act="imp" title="${t.important?"Important : cliquer pour retirer":"Pas important : cliquer pour marquer"}">⭐</button>
       <button class="icon fire${t.urgent?" lit":""}" data-act="urg" title="${t.urgent?"Urgent : cliquer pour éteindre":"Pas urgent : cliquer pour allumer"}">🔥</button>
       <button class="icon" data-act="edit" title="Modifier">✎</button>
@@ -1155,17 +1173,16 @@ function taskHtml(t){
 }
 function renderList(items){
   if(!items.length)return `<div class="empty"><b>Aucune tâche ici</b>${tasks.length?"Changez de jour ou de filtre, ou ":""}cliquez sur « + Nouvelle tâche ».</div>`;
-  const wkKey=t=>t.week&&labelStart(t.weekLabel)?"W"+t.weekLabel:(scope==="day"&&!q.trim()&&!urgF&&t.date!==sel&&doneOn(t)===sel?sel:t.date);
+  const wkKey=t=>t.week&&labelStart(t.weekLabel)?"W"+t.weekLabel:(dayView()?sel:t.date);
   const g={};[...items].sort(byPrio).forEach(t=>(g[wkKey(t)]??=[]).push(t));
   const sortKey=k=>k[0]==="W"?labelStart(k.slice(1)):k;
   return Object.keys(g).sort((a,b)=>sortKey(b).localeCompare(sortKey(a))).map(dt=>{
-    const l=g[dt],done=l.filter(t=>isDone(t.status)).length,open=l.filter(t=>!isDone(t.status)).length;
+    const l=g[dt],done=l.filter(t=>isDone(t.status)).length;
     if(dt[0]==="W"){
       const lab=dt.slice(1);
       return `<section class="group"><h3 class="ghead">Semaine du ${fmt(labelStart(lab),{day:"numeric",month:"long"})} au ${fmt(labelEnd(lab),{day:"numeric",month:"long"})}<span>${done}/${l.length} terminées · jour à préciser (✎)</span></h3>${l.map(taskHtml).join("")}</section>`;
     }
-    const carry=dt<todayIso&&open?`<button class="btn sm" data-carry="${dt}">Reporter ${open} à aujourd'hui</button>`:"";
-    return `<section class="group"><h3 class="ghead">${fmt(dt,{weekday:"long",day:"numeric",month:"long"})}<span>${done}/${l.length} terminées</span>${carry}</h3>${l.map(taskHtml).join("")}</section>`;
+    return `<section class="group"><h3 class="ghead">${fmt(dt,{weekday:"long",day:"numeric",month:"long"})}<span>${done}/${l.length} terminées</span></h3>${l.map(taskHtml).join("")}</section>`;
   }).join("");
 }
 function renderBoard(items){
@@ -1336,6 +1353,14 @@ function toast(msg,undo){
 }
 $("toastBtn").onclick=()=>{if(snap){tasks=JSON.parse(snap);if(snapP)projects=JSON.parse(snapP);save();render()}$("toast").hidden=true};
 const find=id=>tasks.find(t=>t.id===id);
+function newDay(){
+  const now=iso(new Date());if(now===todayIso)return;
+  if(sel===todayIso)sel=now;
+  if(impRef===todayIso)impRef=now;
+  todayIso=now;render();
+}
+setInterval(newDay,60000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)newDay()});
 // SLA automatique : minutes entre le début (jour d'origine + heure) et le clic. 0 si le jour ou l'heure est inconnu.
 function autoSla(t,now=new Date()){
   const a=t.from||t.date;
@@ -1470,18 +1495,16 @@ $("main").onclick=e=>{
   if(nb){const n=+nb.dataset.impNav;if(n===0)impRef=todayIso;else impNav(n);render();return}
   const pb=e.target.closest("[data-p-open],[data-p-back],[data-p-add],[data-p-new],[data-p-pick],[data-p-done],[data-p-urg],[data-p-rename],[data-p-del]");
   if(pb)return projectAction(pb);
-  const c=e.target.closest("[data-carry]");
-  if(c){
-    toast("Tâches reportées à aujourd'hui",true);
-    tasks.forEach(t=>{if(t.date===c.dataset.carry&&!isDone(t.status)){if(!t.week)t.from??=t.date;t.date=todayIso;t.week=false;t.weekLabel=null}});
-    save();render();return;
-  }
   const a=e.target.closest("[data-act]");if(!a||a.tagName==="SELECT")return;
   const t=find(a.closest(".task").dataset.id);
   if(a.dataset.act==="edit")openForm(t);
   if(a.dataset.act==="msearch")mailSearch(t);
   if(a.dataset.act==="urg"){t.urgent=!t.urgent;save();render()}
   if(a.dataset.act==="imp"){t.important=!t.important;save();render()}
+  if(a.dataset.act==="work"){
+    const d=workDay(),w=t.worked||[];
+    t.worked=w.includes(d)?w.filter(x=>x!==d):[...w,d].sort();save();render();
+  }
   if(a.dataset.act==="tick")setStatus(t,isDone(t.status)?"todo":"ok");
   if(a.dataset.act==="unproj"){
     toast("Tâche retirée du projet (elle est conservée)",true);
