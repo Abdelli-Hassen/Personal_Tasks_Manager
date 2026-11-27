@@ -416,7 +416,7 @@ header>div:first-child{flex:0 0 100%}
         <label id="doneDL" hidden>Terminée le<input type="date" name="doneDate"></label>
         <div id="slaL"><div class="slalab">Temps passé pour résoudre (SLA) <b id="slaOut"></b></div><input type="hidden" id="slaV"><div class="sla" id="sla"><button type="button" data-m="10">10 min</button><button type="button" data-m="15">15 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="45">45 min</button><button type="button" data-m="60">1 h</button><button type="button" data-m="120">2 h</button><button type="button" data-m="0">✎ Personnalisé : jours, heures, minutes</button></div>
       <div class="slac" id="slac" hidden><label>Jours<input type="number" id="slaD" min="0" step="1" value="0"></label><label>Heures<input type="number" id="slaH" min="0" step="1" value="1"></label><label>Minutes<input type="number" id="slaM" min="0" step="1" value="0"></label></div>
-        <label class="chkl"><input type="checkbox" name="showDates">Afficher les dates (et la tâche aussi au jour de fin)</label></div>
+        <label class="chkl"><input type="checkbox" name="showDates">Afficher les dates de début et de fin</label></div>
       </section>
       <section class="grp"><div class="gt">📝 Détails</div>
         <label>Commentaire<input name="comment" placeholder="optionnel"></label>
@@ -1061,8 +1061,7 @@ function labelEnd(l){const m=(l||"").match(/->\s*(\d{2})\/(\d{2})\/(\d{2})/);ret
 // une tâche "semaine seulement" couvre toute la plage de sa semaine d'origine
 const range=t=>{const a=t.week&&labelStart(t.weekLabel),b=a&&labelEnd(t.weekLabel);return a&&b?[a,b]:[t.date,t.date]};
 // une tâche terminée un autre jour apparaît aussi le jour où elle a été terminée
-// jour de fin pris en compte (listes, barre des jours, rapports) seulement si la case « Afficher les dates » est cochée
-const doneOn=t=>t.showDates&&isDone(t.status)&&t.doneDate||null;
+const doneOn=t=>isDone(t.status)&&t.doneDate||null;
 const inScope=t=>{
   if(scope==="all")return true;
   const d=doneOn(t);
@@ -1337,9 +1336,16 @@ function toast(msg,undo){
 }
 $("toastBtn").onclick=()=>{if(snap){tasks=JSON.parse(snap);if(snapP)projects=JSON.parse(snapP);save();render()}$("toast").hidden=true};
 const find=id=>tasks.find(t=>t.id===id);
-// l'heure du clic sur « terminé » est mémorisée ; rouvrir la tâche l'efface
+// SLA automatique : minutes entre le début (jour d'origine + heure) et le clic. 0 si le jour ou l'heure est inconnu.
+function autoSla(t,now=new Date()){
+  const a=t.from||t.date;
+  if(!a||!t.time||t.week)return 0;
+  const ms=now-new Date(a+"T"+t.time);
+  return ms>=0?Math.max(1,Math.round(ms/6e4)):0;
+}
+// terminer la tâche note le jour de fin et calcule le SLA ; la rouvrir efface les deux
 function stampStatus(t,s){
-  if(isDone(s)&&!isDone(t.status)){t.doneDate=todayIso;t.doneTime="";t.sla=0}
+  if(isDone(s)&&!isDone(t.status)){t.doneDate=iso(new Date());t.doneTime="";t.sla=autoSla(t)}
   else if(!isDone(s)){t.doneDate=null;t.doneTime="";t.sla=0}
   t.status=s;
 }
@@ -1363,7 +1369,7 @@ function slaSet(min,mark){
 function syncDone(){
   const d=isDone(f.status.value);
   $("slaL").style.display=d?"":"none";
-  if(d&&!f.doneDate.value)f.doneDate.value=todayIso;
+  if(d&&!f.doneDate.value)f.doneDate.value=iso(new Date());
   if(!d){f.doneDate.value="";slaSet(0)}
 }
 f.status.onchange=syncDone;
@@ -1421,8 +1427,8 @@ f.onsubmit=e=>{
   if(editId){
     const t=find(editId);
     if(v.date&&t.date!==v.date)v.from=null;
-    const st=v.status;delete v.status;Object.assign(t,v);stampStatus(t,st);
-    if(isDone(st)){if(f.doneDate.value)t.doneDate=f.doneDate.value;t.sla=+$("slaV").value||0}
+    const st=v.status,wasDone=isDone(t.status);delete v.status;Object.assign(t,v);stampStatus(t,st);
+    if(isDone(st)){if(f.doneDate.value)t.doneDate=f.doneDate.value;t.sla=+$("slaV").value||(wasDone?0:t.sla)}
   }else{const t={id:uid(),...v,status:"todo"};stampStatus(t,v.status);
     if(isDone(v.status)){if(f.doneDate.value)t.doneDate=f.doneDate.value;t.sla=+$("slaV").value||0}
     tasks.push(t)}
